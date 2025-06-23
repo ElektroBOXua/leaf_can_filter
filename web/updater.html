@@ -135,7 +135,7 @@
 
                 statusDiv.textContent = 'Завантаження прошивки... Це може зайняти деякий час.';
 
-                const response = await fetch('http://7.7.7.7/update', {
+                const response = await fetch('http://@ENV:OTA_IP/update', {
                     method: 'POST',
                     body: formData // fetch API автоматично встановить Content-Type: multipart/form-data
                 });

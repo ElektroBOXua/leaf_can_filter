@@ -1,4 +1,5 @@
 #include "leaf_can_filter.h"
+#include "web_arduino_esp32.h"
 
 /******************************************************************************
  * DELTA TIME
@@ -193,7 +194,7 @@ void leaf_can_filter_hal_update_other(uint32_t delta_time_ms)
 	static clock_t heartbeat_timer_ms = 0;
 	heartbeat_timer_ms += delta_time_ms;
 	
-	if (rapid_blink) {
+	if (rapid_blink || web_arduino_esp32_update_success) {
 		static uint8_t rapid_blink_timer = 0;
 
 		rapid_blink_timer += delta_time_ms;
@@ -222,8 +223,6 @@ void leaf_can_filter_hal_update_other(uint32_t delta_time_ms)
 /******************************************************************************
  * TASKS
  *****************************************************************************/
-#include "web_arduino_esp32.h"
-
 void web_interface_task(void *pv_parameters)
 {
 	web_arduino_esp32_init("LeafBOX", true);

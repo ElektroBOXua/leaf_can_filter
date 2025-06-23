@@ -72,6 +72,7 @@ void ws_server_event(uint8_t num, WStype_t type, uint8_t *payload,
 Ticker restart_ticker;
 DNSServer dns_server;
 WebServer web_server(80);
+bool web_arduino_esp32_update_success = false;
 
 void web_ui_send_index()
 {
@@ -86,8 +87,17 @@ void web_ui_send_index()
 
 void web_ui_send_ok()
 {
-	web_server.sendHeader("Access-Control-Allow-Origin", "*");
 	web_server.send(200);
+}
+
+void web_ui_send_update_status()
+{
+	web_server.sendHeader("Access-Control-Allow-Origin", "*");
+	if (web_arduino_esp32_update_success) {
+		web_server.send(200);
+	} else {
+		web_server.send(500);
+	}
 }
 
 void web_ui_safe_restart()
@@ -111,6 +121,7 @@ void web_ui_update_firmware()
 			Serial.println("Update write ok...");
 	} else if (upload.status == UPLOAD_FILE_END) {
 		if (Update.end(true)) {
+			web_arduino_esp32_update_success = true;
 			Serial.println("Update end success");
 			restart_ticker.once(1.0, web_ui_safe_restart);
 		} else {
@@ -137,7 +148,7 @@ void web_arduino_esp32_init(const char *name, bool ap_sta)
 	WiFi.softAP(name);
 
 	web_server.onNotFound(web_ui_send_index);
-	web_server.on("/update", HTTP_POST, web_ui_send_ok,
+	web_server.on("/update", HTTP_POST, web_ui_send_update_status,
 		      web_ui_update_firmware);
 
 	dns_server.start(53, "*", WiFi.softAPIP());
