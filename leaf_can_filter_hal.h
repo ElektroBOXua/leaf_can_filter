@@ -220,6 +220,22 @@ void leaf_can_filter_hal_update_other(uint32_t delta_time_ms)
 }
 
 /******************************************************************************
+ * TASKS
+ *****************************************************************************/
+#include "web_arduino_esp32.h"
+
+void web_interface_task(void *pv_parameters)
+{
+	web_arduino_esp32_init("LeafBOX", true);
+
+	while(1) {
+		web_arduino_esp32_update();
+		vTaskDelay(0);
+	}
+}
+
+
+/******************************************************************************
  * MAIN
  *****************************************************************************/
 void leaf_can_filter_hal_init()
@@ -229,6 +245,8 @@ void leaf_can_filter_hal_init()
 	leaf_can_filter_hal_init_other();
 	leaf_can_filter_hal_init_esp32_twai(&twai_bus_0);
 	leaf_can_filter_hal_init_esp32_twai(&twai_bus_1);
+
+	xTaskCreate(web_interface_task, "web_task", 10000, NULL, 1, NULL);
 }
 
 void leaf_can_filter_hal_update(uint32_t delta_time_ms)
@@ -288,13 +306,17 @@ bool leaf_can_filter_hal_recv_frame(uint8_t bus_id,
 	if (bus_id == 0) {
 		has_frame = leaf_can_filter_hal_esp32_twai_recv(&twai_bus_0,
 								 frame);
-		can0_led = !can0_led;
-		leaf_can_filter_hal_led_update();
+		if (has_frame) {
+			can0_led = !can0_led;
+			leaf_can_filter_hal_led_update();
+		}
 	} else if (bus_id == 1) {
 		has_frame = leaf_can_filter_hal_esp32_twai_recv(&twai_bus_1,
 								 frame);
-		can1_led = !can1_led;
-		leaf_can_filter_hal_led_update();
+		if (has_frame) {
+			can1_led = !can1_led;
+			leaf_can_filter_hal_led_update();
+		}
 	} else {
 		has_frame = false;
 	}

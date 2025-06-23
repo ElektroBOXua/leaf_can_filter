@@ -5,11 +5,12 @@
 ###############################################################################
 COMPILER="$PWD"/tools/arduino-cli
 
-SERIAL_PORT=COM4
+SERIAL_PORT=COM26
 MONITOR_BAUD=115200
 OTA_IP="10.10.10.10"
 
-TARGET=leaf_can_filter_esp32c6_hw1
+export TARGET_NAME="LeafBOX"
+export TARGET=leaf_can_filter_esp32c6_hw1
 
 #EXTRA_FLAGS="-v"
 
@@ -33,12 +34,28 @@ if [ -z "${GIT_REPO_VERSION+x}" ]; then
 	export GIT_REPO_VERSION=$(git describe --tags)
 fi
 
+mk_base64_updater()
+{
+	local BOARD_PATH="${BOARD//:/\.}"  # Replace ':' with '.'
+	local FILE="build/${BOARD_PATH}/$(basename "$PWD").ino.bin"
+
+	# Generate BASE64 firmware
+	export BASE64_ENCODED_FIRMWARE=$(base64 -w 0 "$FILE")
+
+	# Generate updater html file (with embedded base64 firmware)
+	../awk/ENV.awk ../web/updater.html > \
+		     build/"$BOARD_PATH"/"$TARGET"_"$GIT_REPO_VERSION".html
+}
+
 compile() {
 	# enumerate (and empty) all generated files
 	mkdir -p build
 
 	rm build/* 2> /dev/null # Clean build
 	
+
+	echo "Initial setup..."
+
 	# Setup tools and libraries
 	./setup.sh
 	if [[ $? -ne 0 ]]; then
@@ -46,6 +63,9 @@ compile() {
 	    exit 1
 	fi
 
+
+	echo "Testing..."
+	
 	cd tests/
 	./make.sh
 	if [[ $? -ne 0 ]]; then
@@ -54,17 +74,32 @@ compile() {
 	fi
 	cd ..
 
+
 	echo "Copying..."
 
 	# Copy all necessary files into build/
 	cp *.ino                                   build/build.ino
 	cp *.h                                     build/
 	cp libraries/bite/bite.h                   build/
+	cp web/web_arduino_esp32.h                 build/
+
+
+	echo "Building web..."
+
+	# Replace environment variables inside web page
+	awk/ENV.awk web/index.html >> build/index.html
+
+	# Compress WEB
+	gzip -9 -c web/index.html >> build/index.html.gz
+
 
 	echo "Compiling..."
 
 	# Goto build directory with all generated files
 	cd build
+
+	# Make C array from WEB
+	xxd -i index.html.gz >> index.h
 
 	echo "PROPS: " ${PROPS}
 	echo "FQBN: " ${FQBN}
@@ -74,6 +109,8 @@ compile() {
 		read -p "Press any key to continue "
 		exit
 	done
+
+	mk_base64_updater
 }
 
 # Function to monitor
