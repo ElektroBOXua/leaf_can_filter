@@ -78,11 +78,10 @@ compile() {
 	echo "Copying..."
 
 	# Copy all necessary files into build/
-	cp *.ino                                   build/build.ino
+	cp hal/*.ino                               build/build.ino
+	cp hal/*.h                                 build/
 	cp *.h                                     build/
 	cp libraries/bite/bite.h                   build/
-	cp web/web_arduino_esp32.h                 build/
-
 
 	echo "Building web..."
 
