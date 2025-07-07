@@ -1,62 +1,55 @@
 #include "index.h"
 
+#include <ESPAsyncWebServer.h>
+
 /************************************************
  * WS
  ***********************************************/
-#include <WebSocketsServer.h>
+static AsyncWebSocket ws_server("/ws");
 
-WebSocketsServer ws_server = WebSocketsServer(81);
-void		*ws_server_parent;
+void  *ws_server_parent;
 void (*ws_server_connection_handler)(void *parent);
 void (*ws_server_reception_handler)(void *parent, uint8_t *);
 uint8_t ws_server_current_client;
 
 void ws_server_send(uint8_t dst, const char *payload)
 {
-	ws_server.sendTXT(dst, payload);
+	ws_server.text(ws_server_current_client, payload);
 }
 
 void ws_server_send_all(int16_t src, const char *payload)
 {
-	for (uint8_t i = 0; i < WEBSOCKETS_SERVER_CLIENT_MAX; i++) {
-		if (!ws_server.clientIsConnected(i))
-			continue;
-
-		if (i == src)
-			continue;
-
-		ws_server.sendTXT(i, payload);
-	}
+	ws_server.textAll(payload);
 }
 
-void ws_server_event(uint8_t num, WStype_t type, uint8_t *payload,
-		     size_t length)
+void ws_server_handler(AsyncWebSocket *server, AsyncWebSocketClient *client,
+		       AwsEventType type, void *arg, uint8_t *data, size_t len)
 {
-	ws_server_current_client = num;
+	(void)len;
+	ws_server_current_client = client->id();
 
-	switch (type) {
-	case WStype_DISCONNECTED:
-		printf("[%u] Disconnected!\n", num);
-		break;
-	case WStype_CONNECTED: {
-		IPAddress ip = ws_server.remoteIP(num);
-		printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0],
-		       ip[1], ip[2], ip[3], payload);
+	if (type == WS_EVT_CONNECT) {
+		Serial.println("[WEBSOCKET] client connected");
+		client->setCloseClientOnQueueFull(false);
+		client->ping();
 
 		ws_server_connection_handler(ws_server_parent);
-		// ws_server.sendTXT(num, "Connected");
-		break;
-	}
-
-	case WStype_TEXT:
-		printf("[%u] get Text: %s\n", num, payload);
-		ws_server_reception_handler(ws_server_parent, payload);
-		// ws_server.broadcastTXT(payload);
-
-		break;
-
-	default:
-		break;
+	} else if (type == WS_EVT_DISCONNECT) {
+		Serial.println("[WEBSOCKET] client disconnected");
+	} else if (type == WS_EVT_ERROR) {
+		Serial.println("[WEBSOCKET] error");
+	} else if (type == WS_EVT_PONG) {
+		Serial.println("[WEBSOCKET] pong");
+	} else if (type == WS_EVT_DATA) {
+		AwsFrameInfo *info = (AwsFrameInfo *)arg;
+		String msg = "";
+		if (info->final && info->index == 0 && info->len == len) {
+			if (info->opcode == WS_TEXT) {
+				data[len] = 0;
+				ws_server_reception_handler(ws_server_parent, (unsigned char *)data);
+				Serial.printf("[WEBSOCKET] text: %s\n", (unsigned char *)data);
+			}
+		}
 	}
 }
 
@@ -65,39 +58,24 @@ void ws_server_event(uint8_t num, WStype_t type, uint8_t *payload,
  ***********************************************/
 #include <DNSServer.h>
 #include <Update.h>
-#include <WebServer.h>
 #include <WiFi.h>
 #include <Ticker.h>
 
 Ticker restart_ticker;
 DNSServer dns_server;
-WebServer web_server(80);
+static AsyncWebServer web_server(80);
 bool web_arduino_esp32_update_success = false;
 
-void web_ui_send_index()
+void web_ui_send_index(AsyncWebServerRequest *request)
 {
-	web_server.sendHeader("Content-Encoding", "gzip");
-	web_server.sendHeader("Content-Type", "text/html");
-
-	web_server.send_P(200, "text/html",
-			  (const char *)index_html_gz,
-					index_html_gz_len);
-	return;
+	AsyncWebServerResponse *response = request->beginResponse(200, "text/html", index_html_gz, index_html_gz_len);
+	response->addHeader("Content-Encoding", "gzip");
+	request->send(response);
 }
 
-void web_ui_send_ok()
+void web_ui_send_ok(AsyncWebServerRequest *request)
 {
-	web_server.send(200);
-}
-
-void web_ui_send_update_status()
-{
-	web_server.sendHeader("Access-Control-Allow-Origin", "*");
-	if (web_arduino_esp32_update_success) {
-		web_server.send(200);
-	} else {
-		web_server.send(500);
-	}
+	request->send(200);
 }
 
 void web_ui_safe_restart()
@@ -105,27 +83,51 @@ void web_ui_safe_restart()
 	ESP.restart();
 }
 
-void web_ui_update_firmware()
+static void web_ui_handle_cors_preflight(AsyncWebServerRequest *request)
 {
-	uint32_t free_space = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-	HTTPUpload &upload  = web_server.upload();
+	AsyncWebServerResponse *response = request->beginResponse(204, "text/plain");
 
-	if (upload.status == UPLOAD_FILE_START) {
+	response->addHeader("Access-Control-Allow-Origin", "*");
+	/* response->addHeader("Access-Control-Allow-Headers", "Content-Type, X-FileSize"); */
+
+	request->send(response);
+}
+
+static void web_ui_handle_firmware_upload(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+	if (index == 0) {
+		/* size_t filesize = request->header("X-FileSize").toInt();
+		Serial.printf("Update: '%s' size %u\n", filename.c_str(), filesize);
+		if (!Update.begin(filesize, U_FLASH)) { // pass the size provided */
+		uint32_t free_space = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+
 		if (Update.begin(free_space)) {
-			Serial.println("Update begin success");
-		} else {
-			Serial.println("Update begin fail");
+			Update.printError(Serial);
 		}
-	} else if (upload.status == UPLOAD_FILE_WRITE) {
-		if (Update.write(upload.buf, upload.currentSize))
-			Serial.println("Update write ok...");
-	} else if (upload.status == UPLOAD_FILE_END) {
+	}
+
+	if (len) {
+		Serial.printf("writing %d\n", len);
+		if (Update.write(data, len) == len) {
+		} else {
+			Serial.printf("write failed to write %d\n", len);
+		}
+	}
+
+	if (final) {
 		if (Update.end(true)) {
 			web_arduino_esp32_update_success = true;
 			Serial.println("Update end success");
 			restart_ticker.once(1.0, web_ui_safe_restart);
+			AsyncWebServerResponse *response = request->beginResponse(200, "text/plain", "Update successful. Rebooting...");
+			response->addHeader("Access-Control-Allow-Origin", "*");
+			request->send(response);
 		} else {
+			web_arduino_esp32_update_success = false;
 			Serial.println("Update end fail");
+			Update.printError(Serial);
+			AsyncWebServerResponse *response = request->beginResponse(500, "text/plain", "Update failed.");
+			response->addHeader("Access-Control-Allow-Origin", "*");
+			request->send(response);
 		}
 	}
 }
@@ -148,14 +150,17 @@ void web_arduino_esp32_init(const char *name, bool ap_sta)
 	WiFi.softAP(name);
 
 	web_server.onNotFound(web_ui_send_index);
-	web_server.on("/update", HTTP_POST, web_ui_send_update_status,
-		      web_ui_update_firmware);
+	web_server.on("/update", HTTP_POST,
+		     [](AsyncWebServerRequest *request){},
+		     web_ui_handle_firmware_upload);
+	web_server.on("/update", HTTP_OPTIONS, web_ui_handle_cors_preflight);
 
 	dns_server.start(53, "*", WiFi.softAPIP());
-	web_server.begin();
 
-	ws_server.begin();
-	ws_server.onEvent(ws_server_event);
+	ws_server.onEvent(ws_server_handler);
+	web_server.addHandler(&ws_server);
+	
+	web_server.begin();
 }
 
 void web_arduino_esp32_send(uint8_t dst, const char *payload)
@@ -185,6 +190,4 @@ uint8_t web_arduino_esp32_get_client() { return ws_server_current_client; }
 void web_arduino_esp32_update()
 {
 	dns_server.processNextRequest();
-	web_server.handleClient();
-	ws_server.loop();
 }
