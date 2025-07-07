@@ -137,6 +137,9 @@
 
                 const response = await fetch('http://@ENV:OTA_IP/update', {
                     method: 'POST',
+                    /* headers: {
+                       'X-FileSize': len, // Set the custom header
+                    },*/
                     body: formData // fetch API автоматично встановить Content-Type: multipart/form-data
                 });
 
