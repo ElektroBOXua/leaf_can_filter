@@ -104,7 +104,7 @@ compile() {
 	echo "PROPS: " ${PROPS}
 	echo "FQBN: " ${FQBN}
 	while ! ${COMPILER} compile -b ${BOARD}${FQBN} --warnings "all" \
-			   ${PROPS} -e --libraries "libraries/" \
+			   ${PROPS} -e --libraries "../libraries/" \
 			   ${EXTRA_FLAGS}; do
 		read -p "Press any key to continue "
 		exit
