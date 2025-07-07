@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Stop on error
-set -e
-
 #SETUP tools
 if [[ ! -d "tools/" ]]; then
 	mkdir -p tools
@@ -22,15 +19,62 @@ if [[ ! -d "libraries/" ]]; then
 	mkdir -p libraries
 	cd libraries
 
-	curl -L https://github.com/pierremolinaro/acan2515/archive/refs/tags/2.1.5.zip > ar.zip
-	unzip ar.zip
-	rm ar.zip
-
-	curl -L https://github.com/pierremolinaro/acan-esp32/archive/refs/tags/3.0.1.zip > ar.zip
-	unzip ar.zip
-	rm ar.zip
-
-	git clone https://github.com/furdog/bitE.git bite
+	#curl -L https://github.com/adafruit/Adafruit_CAN/archive/refs/tags/0.2.1.zip > ar.zip
+	#unzip ar.zip
+	#rm ar.zip
 
 	cd ..
 fi
+
+#SETUP Clone git libraries
+mkdir -p libraries
+cd libraries
+
+echo "Cloning git libraries..."
+
+REPO_URL="https://github.com/bblanchon/ArduinoJson.git"
+DEST_DIR="$(basename "$REPO_URL" .git)"
+echo "$REPO_URL"
+if [ -d "$DEST_DIR" ]; then
+	(cd "$DEST_DIR" && git pull)
+else
+	(git clone "$REPO_URL")
+fi
+
+REPO_URL="https://github.com/adafruit/Adafruit_NeoPixel.git"
+DEST_DIR="$(basename "$REPO_URL" .git)"
+echo "$REPO_URL"
+if [ -d "$DEST_DIR" ]; then
+	(cd "$DEST_DIR" && git pull)
+else
+	(git clone "$REPO_URL")
+fi
+
+REPO_URL="https://github.com/ESP32Async/AsyncTCP.git"
+DEST_DIR="$(basename "$REPO_URL" .git)"
+echo "$REPO_URL"
+if [ -d "$DEST_DIR" ]; then
+	(cd "$DEST_DIR" && git pull)
+else
+	(git clone "$REPO_URL")
+fi
+
+REPO_URL="https://github.com/ESP32Async/ESPAsyncWebServer.git"
+DEST_DIR="$(basename "$REPO_URL" .git)"
+echo "$REPO_URL"
+if [ -d "$DEST_DIR" ]; then
+	(cd "$DEST_DIR" && git pull)
+else
+	(git clone "$REPO_URL")
+fi
+
+REPO_URL="https://github.com/furdog/bitE.git"
+DEST_DIR="$(basename "$REPO_URL" .git)"
+echo "$REPO_URL"
+if [ -d "$DEST_DIR" ]; then
+	(cd "$DEST_DIR" && git pull)
+else
+	(git clone "$REPO_URL")
+fi
+
+cd ..
