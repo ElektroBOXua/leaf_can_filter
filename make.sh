@@ -90,7 +90,7 @@ compile() {
 	awk/ENV.awk web/index.html >> build/index.html
 
 	# Compress WEB
-	gzip -9 -c web/index.html >> build/index.html.gz
+	gzip -9 -c build/index.html >> build/index.html.gz
 
 
 	echo "Compiling..."
