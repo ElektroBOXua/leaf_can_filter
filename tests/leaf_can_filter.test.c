@@ -30,7 +30,8 @@ void leaf_can_filter_test()
 
 	printf("\n");
 
-	bite_init(&bi, frame.data, frame.len);
+	bite_init(&bi);
+	bite_set_buf(&bi, frame.data, frame.len);
 	bite_begin(&bi, 16, 4, BITE_ORDER_DBC_1);
 	assert(bite_read(&bi) == 12);
 	bite_end(&bi);

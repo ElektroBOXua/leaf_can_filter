@@ -35,7 +35,7 @@ struct leaf_can_filter {
 void _leaf_can_filter(struct leaf_can_filter *self,
 		      struct leaf_can_filter_frame *frame)
 {
-	bite_init(&self->_b, frame->data, frame->len);
+	bite_set_buf(&self->_b, frame->data, frame->len);
 
 	switch (frame->id) {
 	/* BO_ 1468 x5BC: 8 HVBAT */
@@ -60,6 +60,8 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 {
 	struct leaf_can_filter_settings *s = &self->settings;
 	struct leaf_can_filter_runtime  *r = &self->runtime;
+
+	bite_init(&self->_b);
 
 	/* Just a dummy variable (TODO REMOVE) */
 	s->dummy = 0;
