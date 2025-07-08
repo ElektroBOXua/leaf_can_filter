@@ -2,6 +2,7 @@
 #define   LEAF_CAN_FILTER_GUARD
 #include <stdint.h>
 #include "bite.h"
+#include "energy_counter.h"
 
 /******************************************************************************
  * CLASS
