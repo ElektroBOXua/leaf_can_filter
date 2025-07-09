@@ -19,12 +19,18 @@
 struct leaf_bms_vars {
 	uint16_t voltage_V;
 	int16_t  current_A;
+	
+	uint32_t remain_capacity_wh;
+	uint32_t full_capacity_wh;
 };
 
 void leaf_bms_vars_init(struct leaf_bms_vars *self)
 {
 	self->voltage_V = 0U;
 	self->current_A = 0;
+
+	self->remain_capacity_wh = 0U;
+	self->full_capacity_wh   = 0U;
 }
 
 /******************************************************************************
@@ -65,15 +71,68 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 
 	switch (frame->id) {
 	/* BO_ 1468 x5BC: 8 HVBAT */
-	case 1468U:
+	case 1468U: {
+		uint16_t remain_capacity_gids = 0U;
+		uint16_t full_capacity        = 0U;
+
+		/* SG_ LB_Remain_Capacity :
+		 * 	7|10@0+ (1,0) [0|500] "gids" Vector__XXX */
+		bite_begin(&self->_b, 7U, 10U, BITE_ORDER_DBC_0);
+
+		remain_capacity_gids = bite_read_u16(&self->_b);
+
+		if (self->settings.capacity_override_enabled) {
+			uint16_t overriden =
+			  bec_get_remain_cap_kwh(&self->_bec) * 10.0;
+			LEAF_CAN_FILTER_LOG_U16(overriden);  /* TODO FIX LIB */
+			
+			bite_rewind(&self->_b);
+			bite_write_16(&self->_b, overriden);
+		}
+
+		bite_end(&self->_b);
+
+
+		/* SG_ LB_New_Full_Capacity :
+		 * 	13|10@0+ (80,250) [20000|24000] "wh" Vector__XXX */
+		bite_begin(&self->_b, 13U, 10U, BITE_ORDER_DBC_0);
+		full_capacity = bite_read_u16(&self->_b);
+
+		if (self->settings.capacity_override_enabled) {
+			uint16_t overriden = 
+				bec_get_full_cap_kwh(&self->_bec) * 10.0;
+
+			LEAF_CAN_FILTER_LOG_U16(overriden);
+
+			bite_rewind(&self->_b);
+			bite_write_16(&self->_b, overriden); /* TODO FIX LIB */
+		}
+
+		bite_end(&self->_b);
+
 		/* SG_ LB_Remaining_Capacity_Segment m1 :
 		 * 	16|4@1+ (1,0) [0|12] "dash bars" Vector__XXX */
 
 		/* bite_begin(&self->_b, 16, 4, BITE_ORDER_DBC_1);
 		   bite_write(&self->_b, 12);
 		   bite_end(&self->_b);
-		   */
+		   */			
+
+		self->_bms_vars.remain_capacity_wh  = remain_capacity_gids;
+		self->_bms_vars.remain_capacity_wh *= 80U;
+		
+		self->_bms_vars.full_capacity_wh   = full_capacity;
+		self->_bms_vars.full_capacity_wh  *= 80U;
+		self->_bms_vars.full_capacity_wh  += 250U;
+
+		LEAF_CAN_FILTER_LOG_U16(remain_capacity_gids);
+		LEAF_CAN_FILTER_LOG_U16(full_capacity);
+
+		LEAF_CAN_FILTER_LOG_U16(self->_bms_vars.remain_capacity_wh);
+		LEAF_CAN_FILTER_LOG_U16(self->_bms_vars.full_capacity_wh);
+
 		break;
+	}
 
 	/* BO_ 475 x1DB: 8 HVBAT */
 	case 475U: {
@@ -96,6 +155,11 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		self->_bms_vars.voltage_V = voltage_V;
 		self->_bms_vars.current_A = current_A;
 
+		/* Report voltage and current to our energy counter 
+		 * TODO (stop dividing by 2, bec must accept scaled values) */
+		bec_set_voltage_V(&self->_bec, (uint16_t)voltage_V / 2U);
+		bec_set_current_A(&self->_bec, (uint16_t)current_A / 2U);
+
 		LEAF_CAN_FILTER_LOG_U16(voltage_V);
 		LEAF_CAN_FILTER_LOG_I16(current_A);
 
@@ -110,9 +174,7 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 void _leaf_can_filter_update(struct leaf_can_filter *self,
 			     uint32_t delta_time_ms)
 {
-	if (self->settings.capacity_override_enabled) {
-		bec_update(&self->_bec, delta_time_ms);
-	}
+	bec_update(&self->_bec, delta_time_ms);
 }
 
 /******************************************************************************
@@ -134,6 +196,7 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 	bec_init(&self->_bec);
 	bec_set_update_interval_ms(&self->_bec, 10U);
 	leaf_bms_vars_init(&self->_bms_vars);
+
 	/* ... */
 }
 

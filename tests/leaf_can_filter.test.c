@@ -9,6 +9,28 @@ bool cmp_floats_with_epsilon(float a, float b, float e)
 	return fabs(a - b) <= e;
 }
 
+void bite_test_print_buf(uint8_t *buf)
+{
+	int i;
+	int j;
+
+	for (i = 0; i < 8; i++) {
+		printf(BITE_YELLOW"0x%02X     ", buf[i]);
+	}
+	printf("\n");
+
+	for (j = 0; j < 8; j++) {
+		for (i = 8 - 1; i >= 0; i--) {
+			printf((buf[j] & (1U << i)) ? "1" : "0");
+		}
+		printf(" ");
+	}
+	printf(BITE_CRST"\n\n");
+
+	fflush(0);
+}
+
+
 void bec_test()
 {
 	float capacity = 7.0f;
@@ -25,12 +47,13 @@ void bec_test()
 	struct bec bec;
 	
 	bec_init(&bec);
-	bec_set_update_interval_ms  (&bec, 10U);
-	bec_set_battery_capacity_kwh(&bec, capacity);
-	bec_set_initial_energy_kwh  (&bec, 0.0f);
-	bec_set_100_pct_voltage_V   (&bec, 400.0f);
+	bec_set_update_interval_ms (&bec, 10U);
+	bec_set_full_cap_kwh       (&bec, capacity);
+	bec_set_full_cap_voltage_V (&bec, 400.0f);
+	bec_set_initial_cap_kwh    (&bec, 0.0f);
 
-	assert(cmp_floats_with_epsilon(bec_get_energy_kwh(&bec), 0.0, 0.001f));
+	assert(cmp_floats_with_epsilon(
+		bec_get_remain_cap_kwh(&bec), 0.0, 0.001f));
 
 	/* Put 350 volts and 5 amps during 1 hour */
 	for (i = 0; i < ms_per_hour; i++) {
@@ -39,42 +62,47 @@ void bec_test()
 		bec_update(&bec, 1);
 	}
 
-	/* printf("bec._energy_counts: %lli\n", bec._energy_counts);
+	/* printf("bec._cap_counts: %lli\n", bec._cap_counts);
 	 */
-	printf("bec_get_energy_kwh(&bec): %f\n", bec_get_energy_kwh(&bec));
-	assert(cmp_floats_with_epsilon(bec_get_energy_kwh(&bec), 1.750, 0.1));
+	printf("bec_get_remain_cap_kwh(&bec): %f\n",
+		bec_get_remain_cap_kwh(&bec));
+	assert(cmp_floats_with_epsilon(
+		bec_get_remain_cap_kwh(&bec), 1.750, 0.1));
 
 	printf("bec_get_soc_pct(&bec): %f\n", bec_get_soc_pct(&bec));
 	assert(cmp_floats_with_epsilon(bec_get_soc_pct(&bec), 25.0, 0.1));
 
 	/* Put 350 volts and 20 amps during 1 hour (minus one count) */
-	bec_set_initial_energy_kwh(&bec, 0.0f);
+	bec_set_initial_cap_kwh(&bec, 0.0f);
 	for (i = 0; i < ms_per_hour - update_interval_ms; i++) {
 		bec_set_voltage_V(&bec, 350);
 		bec_set_current_A(&bec, 20);
 		bec_update(&bec, 1);
 	}
-	/* printf("bec._energy_counts: %lli\n", bec._energy_counts);
+	/* printf("bec._cap_counts: %lli\n", bec._cap_counts);
 	 */
 	/* Check edge case. Must be less than capacity */
-	assert(bec._energy_counts < capacity_counts);
-	printf("bec_get_energy_kwh(&bec): %f\n", bec_get_energy_kwh(&bec));
+	assert(bec._cap_counts < capacity_counts);
+	printf("bec_get_remain_cap_kwh(&bec): %f\n",
+		bec_get_remain_cap_kwh(&bec));
 
 	/* Add one more count and check edge case 
 	 * Must be equal to capacity */	
 	bec_set_voltage_V(&bec, 350);
 	bec_set_current_A(&bec, 20);
 	bec_update(&bec, update_interval_ms);
-	assert(bec._energy_counts == capacity_counts);
-	printf("bec_get_energy_kwh(&bec): %f\n", bec_get_energy_kwh(&bec));
+	assert(bec._cap_counts == capacity_counts);
+	printf("bec_get_remain_cap_kwh(&bec): %f\n",
+		bec_get_remain_cap_kwh(&bec));
 
 	/* Add one more count and check edge case 
 	 * Should not exceed capacity */
 	bec_set_voltage_V(&bec, 350);
 	bec_set_current_A(&bec, 20);
 	bec_update(&bec, update_interval_ms);
-	assert(bec._energy_counts == capacity_counts);
-	printf("bec_get_energy_kwh(&bec): %f\n", bec_get_energy_kwh(&bec));
+	assert(bec._cap_counts == capacity_counts);
+	printf("bec_get_remain_cap_kwh(&bec): %f\n",
+		bec_get_remain_cap_kwh(&bec));
 
 	printf("bec_get_soc_pct(&bec): %f\n", bec_get_soc_pct(&bec));
 	assert(cmp_floats_with_epsilon(bec_get_soc_pct(&bec), 100.0, 0.1));
@@ -85,26 +113,29 @@ void bec_test()
 		bec_set_current_A(&bec, -20);
 		bec_update(&bec, 1);
 	}
-	/* printf("bec._energy_counts: %lli\n", bec._energy_counts); */
+	/* printf("bec._cap_counts: %lli\n", bec._cap_counts); */
 	/* Check edge case. Must be more than 0.0 kwh */
-	assert(bec._energy_counts > 0.0);
-	printf("bec_get_energy_kwh(&bec): %f\n", bec_get_energy_kwh(&bec));
+	assert(bec._cap_counts > 0.0);
+	printf("bec_get_remain_cap_kwh(&bec): %f\n",
+		bec_get_remain_cap_kwh(&bec));
 
 	/* Add one more count and check edge case 
 	 * Must be equal to 0.0kwh */	
 	bec_set_voltage_V(&bec, 350);
 	bec_set_current_A(&bec, -20);
 	bec_update(&bec, update_interval_ms);
-	assert(bec._energy_counts == 0.0);
-	printf("bec_get_energy_kwh(&bec): %f\n", bec_get_energy_kwh(&bec));
+	assert(bec._cap_counts == 0.0);
+	printf("bec_get_remain_cap_kwh(&bec): %f\n",
+		bec_get_remain_cap_kwh(&bec));
 
 	/* Add one more count and check edge case 
 	 * Should not go below 0.0kwh */
 	bec_set_voltage_V(&bec, 350);
 	bec_set_current_A(&bec, -20);
 	bec_update(&bec, update_interval_ms);
-	assert(bec._energy_counts == 0.0);
-	printf("bec_get_energy_kwh(&bec): %f\n", bec_get_energy_kwh(&bec));
+	assert(bec._cap_counts == 0.0);
+	printf("bec_get_remain_cap_kwh(&bec): %f\n",
+		bec_get_remain_cap_kwh(&bec));
 
 	printf("bec_get_soc_pct(&bec): %f\n", bec_get_soc_pct(&bec));
 	assert(cmp_floats_with_epsilon(bec_get_soc_pct(&bec), 0.0, 0.1));
@@ -113,10 +144,48 @@ void bec_test()
 	bec_set_voltage_V(&bec, 400);
 	bec_set_current_A(&bec, 1);
 	bec_update(&bec, update_interval_ms);
-	assert(bec._energy_counts == capacity_counts);
+	assert(bec._cap_counts == capacity_counts);
 
 	printf("bec_get_soc_pct(&bec): %f\n", bec_get_soc_pct(&bec));
 	assert(cmp_floats_with_epsilon(bec_get_soc_pct(&bec), 100.0, 0.1));
+}
+
+void leaf_can_filter_test_1468U(struct leaf_can_filter *self, struct bite *bi)
+{
+	uint32_t remain_capacity_wh = 0U;
+	uint32_t full_capacity_wh   = 0U;
+
+	struct leaf_can_filter_frame frame;
+	
+	const uint8_t test_data[8] = {
+		0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+	frame.id = 1468U;
+	frame.len = 8U;
+	memcpy(frame.data, test_data, frame.len);
+	leaf_can_filter_process_frame(self, &frame);
+	leaf_can_filter_update(self, 0);
+	
+	bite_set_buf(bi, frame.data, frame.len);
+
+	/* SG_ LB_Remain_Capacity :
+	 * 	7|10@0+ (1,0) [0|500] "gids" Vector__XXX */
+	bite_begin(bi, 7U, 10U, BITE_ORDER_DBC_0);
+	remain_capacity_wh = bite_read_u16(bi);
+	bite_end(bi);
+
+	/* SG_ LB_New_Full_Capacity :
+	 * 	13|10@0+ (80,250) [20000|24000] "wh" Vector__XXX */
+	bite_begin(bi, 13U, 10U, BITE_ORDER_DBC_0);
+	full_capacity_wh = bite_read_u16(bi);
+	bite_end(bi);
+
+	/*printf("full_cap_kwh:   %f\n", bec_get_full_cap_kwh(&self->_bec));
+	  printf("remain_cap_kwh: %f\n", bec_get_remain_cap_kwh(&self->_bec));
+	  */
+
+	printf("remain_capacity_wh: %u\n", remain_capacity_wh);
+	printf("full_capacity_wh:   %u\n", full_capacity_wh);
 }
 
 void leaf_can_filter_test_475U(struct leaf_can_filter *self, struct bite *bi)
@@ -169,6 +238,11 @@ void leaf_can_filter_test()
 
 	leaf_can_filter_init(&fi);
 	fi.settings.bypass = false; /* disable bypass */
+	fi.settings.capacity_override_enabled = true;
+	
+	bec_set_full_cap_kwh(&fi._bec, 24.0f);
+	bec_set_full_cap_voltage_V(&fi._bec, 500.0f);
+	bec_set_initial_cap_kwh(&fi._bec, 10.0f);
 
 	/* test segments
 	frame.id = 1468U;
@@ -184,6 +258,7 @@ void leaf_can_filter_test()
 	
 	bite_init(&bi);
 	leaf_can_filter_test_475U(&fi, &bi);
+	leaf_can_filter_test_1468U(&fi, &bi);
 }
 
 int main()

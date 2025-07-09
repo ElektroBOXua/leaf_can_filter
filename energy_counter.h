@@ -9,8 +9,8 @@
 struct bec
 {
 	/* Config */
-	float    _battery_capacity_kwh;
-	int16_t  _100_pct_voltage_V;
+	float    _full_cap_kwh;
+	int16_t  _full_cap_voltage_V;
 	uint32_t _update_interval_ms;
 	
 	/* Runtime */
@@ -18,7 +18,7 @@ struct bec
 	int16_t _current_A;
 
 	/* Energy counter (accumulator) */
-	int64_t _energy_counts;
+	int64_t _cap_counts;
 	
 	int32_t _update_timer_ms;
 };
@@ -42,14 +42,14 @@ int64_t _bec_conv_kwh_to_counts(struct bec *self, float val)
 void bec_init(struct bec *self)
 {
 	/* Config */
-	self->_battery_capacity_kwh = 0U;
-	self->_100_pct_voltage_V    = 0U;
-	self->_update_interval_ms   = 0U;
+	self->_full_cap_kwh       = 0U;
+	self->_full_cap_voltage_V = 0U;
+	self->_update_interval_ms = 0U;
 
 	/* Runtime */
-	self->_voltage_V          = 0U;
-	self->_current_A          = 0U;
-	self->_energy_counts = 0;
+	self->_voltage_V  = 0U;
+	self->_current_A  = 0U;
+	self->_cap_counts = 0;
 	
 	self->_update_timer_ms = 0;
 }
@@ -57,17 +57,17 @@ void bec_init(struct bec *self)
 /******************************************************************************
  * CONFIG
  *****************************************************************************/
-void bec_set_battery_capacity_kwh(struct bec *self, float val)
+void bec_set_full_cap_kwh(struct bec *self, float val)
 {
-	self->_battery_capacity_kwh = val;
+	self->_full_cap_kwh = val;
 }
 
-float bec_get_battery_capacity_kwh(struct bec *self)
+float bec_get_full_cap_kwh(struct bec *self)
 {
-	return self->_battery_capacity_kwh;
+	return self->_full_cap_kwh;
 }
 
-void bec_set_initial_energy_kwh(struct bec *self, float val)
+void bec_set_initial_cap_kwh(struct bec *self, float val)
 {
 	int64_t e = (int64_t)(val * 1000.0f); /* convert to watts */
 
@@ -77,18 +77,18 @@ void bec_set_initial_energy_kwh(struct bec *self, float val)
 
 	e = e * _bec_get_counts_per_hour(self);
 
-	self->_energy_counts = e;
+	self->_cap_counts = e;
 }
 
-void bec_set_100_pct_voltage_V(struct bec *self, int16_t val)
+void bec_set_full_cap_voltage_V(struct bec *self, int16_t val)
 {
-	self->_100_pct_voltage_V = val;
+	self->_full_cap_voltage_V = val;
 }
 
 void bec_set_update_interval_ms(struct bec *self, uint32_t val)
 {
 	/* Changing interval is undefined behaviour (TODO define) */
-	assert(self->_energy_counts == 0);
+	assert(self->_cap_counts == 0);
 
 	self->_update_interval_ms = val;
 	self->_update_timer_ms    = val;
@@ -111,11 +111,11 @@ void bec_set_current_A(struct bec *self, int16_t val)
 }
 
 /* 1W/bit precision */
-float bec_get_energy_kwh(struct bec *self)
+float bec_get_remain_cap_kwh(struct bec *self)
 {
 	/* Divide accumulated energy to update intervals per hour,
 	 * then convert watts to kilowatts (divide by 1000) */
-	return (self->_energy_counts / _bec_get_counts_per_hour(self)) /
+	return (self->_cap_counts / _bec_get_counts_per_hour(self)) /
 		1000.0f;
 }
 
@@ -123,33 +123,33 @@ float bec_get_soc_pct(struct bec *self)
 {
 	float result = 0.0f;
 
-	if (self->_battery_capacity_kwh > 0.0f) {
-		result = (bec_get_energy_kwh(self) /
-			  self->_battery_capacity_kwh) * 100.0f;
+	if (self->_full_cap_kwh > 0.0f) {
+		result = (bec_get_remain_cap_kwh(self) /
+			  self->_full_cap_kwh) * 100.0f;
 	}
 
 	return result;
 }
 
-void bec_recalc_energy(struct bec *self)
+void bec_recalc_cap(struct bec *self)
 {
 	/* Calculate capacity counts */
 	int64_t capacity_counts =
-		_bec_conv_kwh_to_counts(self, self->_battery_capacity_kwh);
+		_bec_conv_kwh_to_counts(self, self->_full_cap_kwh);
 
-	self->_energy_counts += (int64_t)self->_voltage_V *
+	self->_cap_counts += (int64_t)self->_voltage_V *
 				(int64_t)self->_current_A;
 
-	if (self->_voltage_V >= self->_100_pct_voltage_V) {
-		self->_energy_counts = capacity_counts;
+	if (self->_voltage_V >= self->_full_cap_voltage_V) {
+		self->_cap_counts = capacity_counts;
 	}
 
 	/* Accumulated energy should not exceed battery capacity 
 	 * nor go below negative capacity */
-	if (self->_energy_counts > capacity_counts) {
-		self->_energy_counts = capacity_counts;
-	} else if (self->_energy_counts < 0) {
-		self->_energy_counts = 0;
+	if (self->_cap_counts > capacity_counts) {
+		self->_cap_counts = capacity_counts;
+	} else if (self->_cap_counts < 0) {
+		self->_cap_counts = 0;
 	} else {}
 }
 
@@ -161,7 +161,7 @@ void bec_update(struct bec *self, uint32_t delta_time_ms)
 	if (self->_update_timer_ms >= (int32_t)self->_update_interval_ms) {
 		self->_update_timer_ms -= (int32_t)self->_update_interval_ms;
 
-		bec_recalc_energy(self);
+		bec_recalc_cap(self);
 	}
 }
 
