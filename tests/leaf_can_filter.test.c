@@ -122,7 +122,7 @@ void bec_test()
 void leaf_can_filter_test_475U(struct leaf_can_filter *self, struct bite *bi)
 {
 	uint16_t LB_Total_Voltage = 0;
-	uint16_t LB_Current       = 0;
+	int16_t  LB_Current       = 0;
 
 	struct leaf_can_filter_frame frame;
 
@@ -150,18 +150,13 @@ void leaf_can_filter_test_475U(struct leaf_can_filter *self, struct bite *bi)
 	/* SG_ LB_Current :
 	 * 	7|11@0+ (0.5,0) [-400|200] "A" Vector__XXX */
 	bite_begin(bi, 7, 11, BITE_ORDER_DBC_0);
-	LB_Current |= ((uint16_t)bite_read(bi)) << 3;
-	LB_Current |= ((uint16_t)bite_read(bi)) << 0;
+	LB_Current = bite_read_i16(bi);
 	bite_end(bi);
 
 	assert(LB_Total_Voltage == (425 * 2));
 	/* assert(LB_Current == (175 * 2)); */
 
-	if (LB_Current & 0x0400) {
-		LB_Current |= 0xf800;
-	}
-
-	assert((int16_t)LB_Current == (-350 * 2));
+	assert(LB_Current == (-350 * 2));
 }
 
 void leaf_can_filter_test()
