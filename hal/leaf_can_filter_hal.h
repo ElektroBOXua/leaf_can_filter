@@ -1,22 +1,5 @@
 #include "leaf_can_filter.h"
-#include "web_arduino_esp32.h"
-
-/******************************************************************************
- * DELTA TIME
- *****************************************************************************/
-static clock_t timestamp_prev = 0;
-static clock_t timestamp      = 0;
-
-clock_t leaf_can_filter_hal_get_delta_time_ms()
-{
-	clock_t delta;
-	
-	timestamp = millis();
-	delta = timestamp - timestamp_prev;
-	timestamp_prev = timestamp;
-	
-	return delta;
-}
+#include "leaf_can_filter_web.h"
 
 /******************************************************************************
  * ESP32 TWAI
@@ -194,7 +177,7 @@ void leaf_can_filter_hal_update_other(uint32_t delta_time_ms)
 	static clock_t heartbeat_timer_ms = 0;
 	heartbeat_timer_ms += delta_time_ms;
 	
-	if (rapid_blink || web_arduino_esp32_update_success) {
+	if (rapid_blink || leaf_can_filter_web_update_success) {
 		static uint8_t rapid_blink_timer = 0;
 
 		rapid_blink_timer += delta_time_ms;
@@ -221,20 +204,6 @@ void leaf_can_filter_hal_update_other(uint32_t delta_time_ms)
 }
 
 /******************************************************************************
- * TASKS
- *****************************************************************************/
-void web_interface_task(void *pv_parameters)
-{
-	web_arduino_esp32_init("LeafBOX", true);
-
-	while(1) {
-		web_arduino_esp32_update();
-		vTaskDelay(0);
-	}
-}
-
-
-/******************************************************************************
  * MAIN
  *****************************************************************************/
 void leaf_can_filter_hal_init()
@@ -244,8 +213,6 @@ void leaf_can_filter_hal_init()
 	leaf_can_filter_hal_init_other();
 	leaf_can_filter_hal_init_esp32_twai(&twai_bus_0);
 	leaf_can_filter_hal_init_esp32_twai(&twai_bus_1);
-
-	xTaskCreate(web_interface_task, "web_task", 10000, NULL, 1, NULL);
 }
 
 void leaf_can_filter_hal_update(uint32_t delta_time_ms)

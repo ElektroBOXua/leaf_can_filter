@@ -152,8 +152,11 @@ void bec_test()
 
 void leaf_can_filter_test_1468U(struct leaf_can_filter *self, struct bite *bi)
 {
-	uint32_t remain_capacity_wh = 0U;
-	uint32_t full_capacity_wh   = 0U;
+	uint16_t remain_capacity_gids = 0U;
+	uint16_t full_capacity        = 0U;
+	
+	float remain_capacity_kwh = 0U;
+	float full_capacity_kwh   = 0U;
 
 	struct leaf_can_filter_frame frame;
 	
@@ -171,25 +174,42 @@ void leaf_can_filter_test_1468U(struct leaf_can_filter *self, struct bite *bi)
 	/* SG_ LB_Remain_Capacity :
 	 * 	7|10@0+ (1,0) [0|500] "gids" Vector__XXX */
 	bite_begin(bi, 7U, 10U, BITE_ORDER_DBC_0);
-	remain_capacity_wh = bite_read_u16(bi);
+	remain_capacity_gids = bite_read_u16(bi);
 	bite_end(bi);
 
 	/* SG_ LB_New_Full_Capacity :
 	 * 	13|10@0+ (80,250) [20000|24000] "wh" Vector__XXX */
 	bite_begin(bi, 13U, 10U, BITE_ORDER_DBC_0);
-	full_capacity_wh = bite_read_u16(bi);
+	full_capacity = bite_read_u16(bi);
 	bite_end(bi);
 
 	/*printf("full_cap_kwh:   %f\n", bec_get_full_cap_kwh(&self->_bec));
 	  printf("remain_cap_kwh: %f\n", bec_get_remain_cap_kwh(&self->_bec));
 	  */
 
-	printf("remain_capacity_wh: %u\n", remain_capacity_wh);
-	printf("full_capacity_wh:   %u\n", full_capacity_wh);
+	printf("remain_capacity_gids: %u\n", remain_capacity_gids);
+	printf("full_capacity:   %u\n",      full_capacity);
+
+	remain_capacity_kwh = (remain_capacity_gids * 80.0f) / 1000.0f;
+	full_capacity_kwh   = ((full_capacity * 80.0f) + 250.0f) / 1000.0f;
+
+	printf("remain_capacity_kwh: %f\n", remain_capacity_kwh);
+	printf("full_capacity_kwh:   %f\n", full_capacity_kwh);
+
+	assert(cmp_floats_with_epsilon(remain_capacity_kwh, 5.0, 0.1));
+	assert(cmp_floats_with_epsilon(full_capacity_kwh, 24.0, 0.1));
+
+	bite_test_print_buf(frame.data);
+	/* Assert correct frame data representation */
+	assert(frame.data[0] == 0x0F && frame.data[1] == 0xD2 &&
+	       frame.data[2] == 0x8F );
 }
 
 void leaf_can_filter_test_475U(struct leaf_can_filter *self, struct bite *bi)
 {
+	uint32_t i;
+	uint32_t ms_per_min = 1000 * 60U;
+
 	uint16_t LB_Total_Voltage = 0;
 	int16_t  LB_Current       = 0;
 
@@ -226,6 +246,17 @@ void leaf_can_filter_test_475U(struct leaf_can_filter *self, struct bite *bi)
 	/* assert(LB_Current == (175 * 2)); */
 
 	assert(LB_Current == (-350 * 2));
+
+	printf("_voltage_V: %i\n", self->_bec._voltage_V);
+	printf("_current_A: %i\n", self->_bec._current_A);
+	assert(self->_bec._voltage_V == 425);
+	assert(self->_bec._current_A == -350);
+
+	/* Keep discharge for 2 mins, this should drop about ~5kwh 
+	 * (It's ok since current and voltage are huge) */
+	for (i = 0; i < ms_per_min * 2; i++) {
+		leaf_can_filter_update(self, 1);
+	}
 }
 
 void leaf_can_filter_test()

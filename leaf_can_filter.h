@@ -83,8 +83,9 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 
 		if (self->settings.capacity_override_enabled) {
 			uint16_t overriden =
-			  bec_get_remain_cap_kwh(&self->_bec) * 10.0;
-			LEAF_CAN_FILTER_LOG_U16(overriden);  /* TODO FIX LIB */
+				      bec_get_remain_cap_wh(&self->_bec) / 80U;
+			
+			LEAF_CAN_FILTER_LOG_U16(overriden);
 			
 			bite_rewind(&self->_b);
 			bite_write_16(&self->_b, overriden);
@@ -100,12 +101,12 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 
 		if (self->settings.capacity_override_enabled) {
 			uint16_t overriden = 
-				bec_get_full_cap_kwh(&self->_bec) * 10.0;
+			       (bec_get_full_cap_wh(&self->_bec) - 250U) / 80U;
 
 			LEAF_CAN_FILTER_LOG_U16(overriden);
 
 			bite_rewind(&self->_b);
-			bite_write_16(&self->_b, overriden); /* TODO FIX LIB */
+			bite_write_16(&self->_b, overriden);
 		}
 
 		bite_end(&self->_b);
@@ -157,8 +158,8 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 
 		/* Report voltage and current to our energy counter 
 		 * TODO (stop dividing by 2, bec must accept scaled values) */
-		bec_set_voltage_V(&self->_bec, (uint16_t)voltage_V / 2U);
-		bec_set_current_A(&self->_bec, (uint16_t)current_A / 2U);
+		bec_set_voltage_V(&self->_bec, voltage_V / 2U);
+		bec_set_current_A(&self->_bec, current_A / 2);
 
 		LEAF_CAN_FILTER_LOG_U16(voltage_V);
 		LEAF_CAN_FILTER_LOG_I16(current_A);

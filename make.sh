@@ -5,7 +5,7 @@
 ###############################################################################
 COMPILER="$PWD"/tools/arduino-cli
 
-SERIAL_PORT=COM26
+SERIAL_PORT=COM5
 MONITOR_BAUD=115200
 export OTA_IP="10.10.10.10"
 
@@ -98,6 +98,7 @@ compile() {
 	cd build
 
 	# Make C array from WEB
+	echo "#pragma once" >> index.h
 	xxd -i index.html.gz >> index.h
 
 	echo "PROPS: " ${PROPS}
