@@ -21,6 +21,8 @@ Ticker leaf_can_filter_web_cpu_reset_ticker;
 
 struct leaf_can_filter *leaf_can_filter_web_instance = NULL;
 
+extern SemaphoreHandle_t _filter_mutex;
+
 /******************************************************************************
  * OTHER HAL
  *****************************************************************************/
@@ -204,11 +206,14 @@ void web_socket_handler(AsyncWebSocket *server, AsyncWebSocketClient *client,
 		if (info->final && (info->index == 0) && (info->len == len) &&
 		    (info->opcode == WS_TEXT)) {
 			data[len] = 0;
-			leaf_can_filter_web_recv_msg(
-			     leaf_can_filter_web_instance, client,
-			     (const char *)data);
-			Serial.printf("[WEBSOCKET] text: %s\n",
-				       (const char *)data);
+			if (xSemaphoreTake(_filter_mutex, portMAX_DELAY) == pdTRUE) {
+				leaf_can_filter_web_recv_msg(
+				     leaf_can_filter_web_instance, client,
+				     (const char *)data);
+				Serial.printf("[WEBSOCKET] text: %s\n",
+					       (const char *)data);
+				xSemaphoreGive(_filter_mutex);
+			}
 		}
 		
 		break;
@@ -353,7 +358,10 @@ void leaf_can_filter_web_update(struct leaf_can_filter *self,
 	if (repeat_ms <= 0) {
 		repeat_ms = 1000;
 
-		leaf_can_filter_web_send_update(self);
+		if (xSemaphoreTake(_filter_mutex, portMAX_DELAY) == pdTRUE) {
+			leaf_can_filter_web_send_update(self);
+			xSemaphoreGive(_filter_mutex);
+		}
 	}
 
 	dns_server.processNextRequest();
