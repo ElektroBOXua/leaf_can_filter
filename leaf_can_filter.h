@@ -17,8 +17,8 @@
  * CLASS
  *****************************************************************************/
 struct leaf_bms_vars {
-	uint16_t voltage_V;
-	int16_t  current_A;
+	float voltage_V;
+	float current_A;
 	
 	uint32_t remain_capacity_wh;
 	uint32_t full_capacity_wh;
@@ -26,8 +26,8 @@ struct leaf_bms_vars {
 
 void leaf_bms_vars_init(struct leaf_bms_vars *self)
 {
-	self->voltage_V = 0U;
-	self->current_A = 0;
+	self->voltage_V = 0.0f;
+	self->current_A = 0.0f;
 
 	self->remain_capacity_wh = 0U;
 	self->full_capacity_wh   = 0U;
@@ -50,6 +50,8 @@ struct leaf_can_filter_settings {
 	/* Override bms capacity (enables energy counter) */
 	bool  capacity_override_enabled;
 	float capacity_override_kwh;
+	float capacity_remaining_kwh;
+	float capacity_full_voltage_V;
 };
 
 struct leaf_can_filter {
@@ -126,6 +128,11 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		self->_bms_vars.full_capacity_wh  *= 80U;
 		self->_bms_vars.full_capacity_wh  += 250U;
 
+		/*if (!self->settings.capacity_override_enabled) {
+			self->settings.capacity_override_kwh =
+				self->_bms_vars.full_capacity_wh / 1000.0f;
+		}*/
+
 		LEAF_CAN_FILTER_LOG_U16(remain_capacity_gids);
 		LEAF_CAN_FILTER_LOG_U16(full_capacity);
 
@@ -153,13 +160,17 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		current_A = bite_read_i16(&self->_b);
 		bite_end(&self->_b);
 
-		self->_bms_vars.voltage_V = voltage_V;
-		self->_bms_vars.current_A = current_A;
+		self->_bms_vars.voltage_V = voltage_V / 2.0f;
+		self->_bms_vars.current_A = current_A / 2.0f;
 
 		/* Report voltage and current to our energy counter 
 		 * TODO (stop dividing by 2, bec must accept scaled values) */
 		bec_set_voltage_V(&self->_bec, voltage_V / 2U);
 		bec_set_current_A(&self->_bec, current_A / 2);
+
+		/* Save remaining capacity into settings */
+		self->settings.capacity_remaining_kwh =
+			bec_get_remain_cap_kwh(&self->_bec);
 
 		LEAF_CAN_FILTER_LOG_U16(voltage_V);
 		LEAF_CAN_FILTER_LOG_I16(current_A);
@@ -192,6 +203,8 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 
 	s->capacity_override_enabled = false;
 	s->capacity_override_kwh     = 0.0f;
+	s->capacity_remaining_kwh    = 0.0f;
+	s->capacity_full_voltage_V   = 0.0f;
 
 	/* Runtime */
 	bec_init(&self->_bec);

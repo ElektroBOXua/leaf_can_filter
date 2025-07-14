@@ -42,13 +42,80 @@ void leaf_can_filter_web_cpu_reset(struct leaf_can_filter *self)
 #include <ArduinoJson.h>
 
 enum leaf_can_filter_web_msg_type {
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_STATUS,
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_EN,
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_KWH,
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_FULL_VOLTAGE_V,
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_CPU_RESET,
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP,
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN,
 
 	LEAF_CAN_FILTER_WEB_MSG_MAX
 };
 
-void leaf_can_filter_web_msg(struct leaf_can_filter *self,
-			     const char *payload)
+void web_socket_broadcast_all_except_sender(AsyncWebSocketClient *sender,
+					    const char* message)
+{
+	for (uint32_t i = 0; i < web_socket.count(); ++i) {
+		AsyncWebSocketClient* client = web_socket.client(i);
+
+		if (client != NULL && client != sender) {
+			client->text(message);
+		}
+	}
+}
+
+void leaf_can_filter_web_send_initial_msg(struct leaf_can_filter *self)
+{
+	String	serialized;
+
+	JsonDocument doc;
+	JsonArray	    array = doc.to<JsonArray>();
+	JsonArray	    narr;
+	JsonArray	    narr2;
+	/* JsonObject	    nobj; */
+
+	narr = array.add<JsonArray>();
+	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_STATUS);
+	narr2 = narr.add<JsonArray>();
+	narr2.add(self->_bms_vars.voltage_V);
+	narr2.add(self->_bms_vars.current_A);
+	if (self->settings.capacity_override_enabled) {
+		narr2.add(bec_get_full_cap_kwh(&self->_bec));
+		narr2.add(bec_get_remain_cap_kwh(&self->_bec));
+	} else {
+		narr2.add(self->_bms_vars.full_capacity_wh / 1000.0f);
+		narr2.add(self->_bms_vars.remain_capacity_wh / 1000.0f);
+	}
+
+	narr = array.add<JsonArray>();
+	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_EN);
+	narr.add(self->settings.capacity_override_enabled);
+
+	narr = array.add<JsonArray>();
+	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_KWH);
+	narr.add(self->settings.capacity_override_kwh);
+
+	narr = array.add<JsonArray>();
+	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_FULL_VOLTAGE_V);
+	narr.add(self->settings.capacity_full_voltage_V);
+
+	narr = array.add<JsonArray>();
+	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN);
+	narr.add(self->settings.bypass);
+
+	serializeJson(array, serialized);
+	web_socket.textAll(serialized.c_str());
+}
+
+void leaf_can_filter_web_send_update(struct leaf_can_filter *self)
+{
+	leaf_can_filter_web_send_initial_msg(self);
+}
+
+void leaf_can_filter_web_recv_msg(struct leaf_can_filter *self,
+				  AsyncWebSocketClient *sender,
+				  const char *payload)
 {
 	uint8_t type;
 	
@@ -63,32 +130,44 @@ void leaf_can_filter_web_msg(struct leaf_can_filter *self,
 	value = array[1];
 
 	switch (type) {
+	case LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_EN:
+		self->settings.capacity_override_enabled = value.as<bool>();
+		leaf_can_filter_fs_save(self);
+
+		break;
+
+	case LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_KWH:
+		self->settings.capacity_override_kwh = value.as<float>();
+		bec_set_full_cap_kwh(&self->_bec, value.as<float>());
+		leaf_can_filter_fs_save(self);
+
+		break;
+
+	case LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_FULL_VOLTAGE_V:
+		self->settings.capacity_full_voltage_V = value.as<float>();
+		bec_set_full_cap_voltage_V(&self->_bec, value.as<float>());
+		leaf_can_filter_fs_save(self);
+
+		break;
+
 	case LEAF_CAN_FILTER_WEB_MSG_TYPE_CPU_RESET:
 		leaf_can_filter_web_cpu_reset(self);
-		return; /* Prevents default send action, down there. */
+		return;
+
+	case LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP:
+		/* TODO IMPLEMENT */
+		return;
+
+	case LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN:
+		self->settings.bypass = value.as<bool>();
+		leaf_can_filter_fs_save(self);
+		return;
 
 	default:
 		break;
 	}
 
-	web_socket.textAll(payload);
-}
-
-void leaf_can_filter_web_send_update(struct leaf_can_filter *self)
-{
-	String	serialized;
-
-	JsonDocument doc;
-	JsonArray	    array = doc.to<JsonArray>();
-	JsonArray	    narr;
-	/* JsonObject	    nobj; */
-
-	narr = array.add<JsonArray>();
-	narr.add(1337);
-	narr.add("HELLO!");
-
-	serializeJson(array, serialized);
-	web_socket.textAll(serialized.c_str());
+	web_socket_broadcast_all_except_sender(sender, payload);
 }
 
 /******************************************************************************
@@ -125,8 +204,9 @@ void web_socket_handler(AsyncWebSocket *server, AsyncWebSocketClient *client,
 		if (info->final && (info->index == 0) && (info->len == len) &&
 		    (info->opcode == WS_TEXT)) {
 			data[len] = 0;
-			leaf_can_filter_web_msg(leaf_can_filter_web_instance,
-						(const char *)data);
+			leaf_can_filter_web_recv_msg(
+			     leaf_can_filter_web_instance, client,
+			     (const char *)data);
 			Serial.printf("[WEBSOCKET] text: %s\n",
 				       (const char *)data);
 		}

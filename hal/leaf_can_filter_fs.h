@@ -4,14 +4,14 @@
 #include "LittleFS.h"
 #include "leaf_can_filter.h"
 
-#define LEAF_CAN_FILTER_FS_THROTTLE_TIME_MS 5000
+#define LEAF_CAN_FILTER_FS_THROTTLE_TIME_MS 10000
 
 /******************************************************************************
  * GLOBALS
  *****************************************************************************/
 /* Set global variable that indicates filesystem is corrupted. */
 bool leaf_can_filter_fs_is_corrupted = false;
-bool leaf_can_filter_fs_commited     = false; /* Settings changed */
+bool leaf_can_filter_fs_is_commited  = false; /* Settings changed */
 
 /******************************************************************************
  * PRIVATE
@@ -31,7 +31,7 @@ void _leaf_can_filter_fs_save(struct leaf_can_filter *self)
 		f.close();
 	}
 
-	leaf_can_filter_fs_commited = false;
+	leaf_can_filter_fs_is_commited = false;
 }
 
 /******************************************************************************
@@ -39,7 +39,7 @@ void _leaf_can_filter_fs_save(struct leaf_can_filter *self)
  *****************************************************************************/
 void leaf_can_filter_fs_save(struct leaf_can_filter *self)
 {
-	leaf_can_filter_fs_commited = true;
+	leaf_can_filter_fs_is_commited = true;
 }
 
 void leaf_can_filter_fs_load(struct leaf_can_filter *self)
@@ -64,6 +64,15 @@ void leaf_can_filter_fs_load(struct leaf_can_filter *self)
 
 		f.close();
 	}
+
+	/* Set capacity */
+	bec_set_full_cap_kwh(&self->_bec,
+			     self->settings.capacity_override_kwh);
+	bec_set_full_cap_voltage_V(&self->_bec,
+				    self->settings.capacity_full_voltage_V);
+
+	bec_set_initial_cap_kwh(&self->_bec,
+			     self->settings.capacity_remaining_kwh);
 }
 
 void leaf_can_filter_fs_init(struct leaf_can_filter *self)
@@ -86,9 +95,17 @@ void leaf_can_filter_fs_update(struct leaf_can_filter *self,
 		update_throttle_ms -= delta_time_ms;
 	}
 
-	if (leaf_can_filter_fs_commited && update_throttle_ms <= 0) {
+	if (leaf_can_filter_fs_is_commited && update_throttle_ms <= 0) {
 		_leaf_can_filter_fs_save(self);
 		
 		update_throttle_ms = LEAF_CAN_FILTER_FS_THROTTLE_TIME_MS;
+	}
+
+	/* Save remaining kwh onto flash */
+	if (self->settings.capacity_override_enabled) {
+		self->settings.capacity_remaining_kwh =
+			bec_get_remain_cap_kwh(&self->_bec);
+
+		leaf_can_filter_fs_save(self);
 	}
 }
