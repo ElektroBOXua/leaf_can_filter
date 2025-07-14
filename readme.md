@@ -12,8 +12,9 @@
 ---
 * energy counter must have 0.5V/bit precision
 * ~~override bms capacity~~
-* Write filesystem
-* Write web interface
+* ~~Write filesystem~~
+* ~~Write web interface~~
+* Eliminate race conditions
 
 **Completion: 0/2**
 
