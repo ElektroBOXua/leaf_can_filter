@@ -7,11 +7,17 @@
 #include "driver/gpio.h"
 #include "driver/twai.h"
 
-#define TWAI_BUS_0_TX GPIO_NUM_19
-#define TWAI_BUS_0_RX GPIO_NUM_20
+//#define TWAI_BUS_0_TX GPIO_NUM_19
+//#define TWAI_BUS_0_RX GPIO_NUM_20
 
-#define TWAI_BUS_1_TX GPIO_NUM_22
-#define TWAI_BUS_1_RX GPIO_NUM_21
+//#define TWAI_BUS_1_TX GPIO_NUM_22
+//#define TWAI_BUS_1_RX GPIO_NUM_21
+
+#define TWAI_BUS_0_TX GPIO_NUM_13
+#define TWAI_BUS_0_RX GPIO_NUM_12
+
+#define TWAI_BUS_1_TX GPIO_NUM_14
+#define TWAI_BUS_1_RX GPIO_NUM_15
 
 static twai_handle_t twai_bus_0;
 static twai_handle_t twai_bus_1;
