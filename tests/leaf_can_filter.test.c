@@ -292,9 +292,62 @@ void leaf_can_filter_test()
 	leaf_can_filter_test_1468U(&fi, &bi);
 }
 
+void led_indicator_test()
+{
+	struct dev_timeout_led_indicator li;
+
+	/* Test invalid config */
+	dev_timeout_led_indicator_init(&li);
+	assert(dev_timeout_led_indicator_update(&li, 0) == false);
+	assert(li._state == DEV_TIMEOUT_LED_INDICATOR_STATE_CONFIG_INVALID);
+
+	/* Test timeout */
+	dev_timeout_led_indicator_init(&li);
+	dev_timeout_led_indicator_set_count(&li, 2);
+	assert(dev_timeout_led_indicator_update(&li, 0) == true);
+	/* printf("%i\n", li._state); */
+	assert(li._state == DEV_TIMEOUT_LED_INDICATOR_STATE_WAIT);
+
+	assert(dev_timeout_led_indicator_update(&li, 750) == false);
+	assert(li._state == DEV_TIMEOUT_LED_INDICATOR_STATE_BLINK_0);
+
+	assert(dev_timeout_led_indicator_update(&li, 200) == true);
+	assert(li._state == DEV_TIMEOUT_LED_INDICATOR_STATE_BLINK_1);
+
+	assert(dev_timeout_led_indicator_update(&li, 50) == false);
+	assert(li._state == DEV_TIMEOUT_LED_INDICATOR_STATE_TIMEOUT);
+	assert(li._dev_sel == 1);
+
+	/* Two blinks */
+	assert(dev_timeout_led_indicator_update(&li, 0) == true);
+	assert(li._state == DEV_TIMEOUT_LED_INDICATOR_STATE_WAIT);
+	assert(dev_timeout_led_indicator_update(&li, 750) == false);
+	assert(dev_timeout_led_indicator_update(&li, 200) == true);
+	assert(dev_timeout_led_indicator_update(&li, 50) == true);
+	assert(li._dev_sel == 1);
+
+	assert(dev_timeout_led_indicator_update(&li, 0) == false);
+	assert(li._state == DEV_TIMEOUT_LED_INDICATOR_STATE_BLINK_0);
+	assert(dev_timeout_led_indicator_update(&li, 200) == true);
+	assert(dev_timeout_led_indicator_update(&li, 50) == false);
+	assert(li._dev_sel == 1);
+
+	dev_timeout_led_indicator_update_timer(&li, 0, 500);
+	dev_timeout_led_indicator_update_timer(&li, 1, 500);
+	assert(li._state == DEV_TIMEOUT_LED_INDICATOR_STATE_NORMAL);
+	assert(dev_timeout_led_indicator_update(&li, 0) == true);
+
+	assert(dev_timeout_led_indicator_update(&li, 0) == false);
+
+	assert(dev_timeout_led_indicator_update(&li, 1000) == false);
+	assert(dev_timeout_led_indicator_update(&li, 0) == true);
+	assert(li._state == DEV_TIMEOUT_LED_INDICATOR_STATE_WAIT);
+}
+
 int main()
 {
 	leaf_can_filter_test();
 	bec_test();
+	led_indicator_test();
 	return 0;
 }

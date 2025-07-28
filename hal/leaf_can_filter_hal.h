@@ -162,11 +162,15 @@ bool leaf_can_filter_hal_esp32_twai_recv(twai_handle_t *bus,
 bool can0_led    = false;
 bool can1_led    = false;
 bool rapid_blink = false;
+struct dev_timeout_led_indicator led_indicator;
 
-Adafruit_NeoPixel ws2812b(NUM_PIXELS, PIN_WS2812B, NEO_RGB + NEO_KHZ800);
+Adafruit_NeoPixel ws2812b(NUM_PIXELS, PIN_WS2812B, NEO_GRB + NEO_KHZ800);
 
 void leaf_can_filter_hal_init_other()
 {
+	dev_timeout_led_indicator_init(&led_indicator);
+	dev_timeout_led_indicator_set_count(&led_indicator, 2);
+
 	ws2812b.begin();  // initialize WS2812B strip object (REQUIRED)
 }
 
@@ -198,7 +202,7 @@ void leaf_can_filter_hal_update_other(uint32_t delta_time_ms)
 		}
 	}
 
-	if (heartbeat_timer_ms >= 5000)
+	/*if (heartbeat_timer_ms >= 5000)
 	{
 		heartbeat_timer_ms = 0;
 
@@ -206,6 +210,12 @@ void leaf_can_filter_hal_update_other(uint32_t delta_time_ms)
 		can1_led = !can1_led;
 
 		leaf_can_filter_hal_led_update();
+	}*/
+
+	if (dev_timeout_led_indicator_update(&led_indicator, delta_time_ms)) {
+		ws2812b.setPixelColor(0, led_indicator.c.r, led_indicator.c.g,
+					 led_indicator.c.b);
+		ws2812b.show();
 	}
 }
 
@@ -279,15 +289,20 @@ bool leaf_can_filter_hal_recv_frame(uint8_t bus_id,
 		has_frame = leaf_can_filter_hal_esp32_twai_recv(&twai_bus_0,
 								 frame);
 		if (has_frame) {
-			can0_led = !can0_led;
-			leaf_can_filter_hal_led_update();
+			dev_timeout_led_indicator_update_timer(
+						      &led_indicator, 0, 5000);
+			/* can0_led = !can0_led;
+			leaf_can_filter_hal_led_update(); */
 		}
 	} else if (bus_id == 1) {
 		has_frame = leaf_can_filter_hal_esp32_twai_recv(&twai_bus_1,
 								 frame);
 		if (has_frame) {
-			can1_led = !can1_led;
-			leaf_can_filter_hal_led_update();
+			dev_timeout_led_indicator_update_timer(
+						      &led_indicator, 1, 5000);
+			/* can1_led = !can1_led;
+			   leaf_can_filter_hal_led_update();
+			*/
 		}
 	} else {
 		has_frame = false;

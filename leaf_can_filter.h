@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include "bite.h"
 #include "energy_counter.h"
+#include "dev_timeout_led_indicator.h"
 
 /******************************************************************************
  * CLASS
