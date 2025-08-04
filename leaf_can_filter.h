@@ -75,16 +75,39 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 	switch (frame->id) {
 	/* BO_ 1468 x5BC: 8 HVBAT */
 	case 1468U: {
-		uint16_t remain_capacity_gids = 0U;
-		uint16_t full_capacity        = 0U;
+		uint16_t capacity_gids     = 0U;
+		/* uint16_t full_capacity = 0U; */
+
+		/* capacity_gids will show either full or remaining capacity
+		 * based on this mux: */
+		bool full_capacity_mux = ((frame->data[5U] & 0x10U) > 0U);
+
+		/* If LBC not booted up - exit */
+		if (frame->data[0U] == 0xFFU) {
+			break;
+		}
 
 		/* SG_ LB_Remain_Capacity :
 		 * 	7|10@0+ (1,0) [0|500] "gids" Vector__XXX */
 		bite_begin(&self->_b, 7U, 10U, BITE_ORDER_DBC_0);
 
-		remain_capacity_gids = bite_read_u16(&self->_b);
+		capacity_gids = bite_read_u16(&self->_b);
 
-		if (self->settings.capacity_override_enabled) {
+		/* Override full capacity (full_capacity_mux enabled) */
+		if (self->settings.capacity_override_enabled &&
+		    full_capacity_mux) {
+			uint16_t overriden = 
+			      bec_get_full_cap_wh(&self->_bec) / 80U;
+			
+			LEAF_CAN_FILTER_LOG_U16(overriden);
+			
+			bite_rewind(&self->_b);
+			bite_write_16(&self->_b, overriden);
+		}
+
+		/* Override remaining capacity (full_capacity_mux disabled) */
+		if (self->settings.capacity_override_enabled &&
+		    !full_capacity_mux) {
 			uint16_t overriden =
 				      bec_get_remain_cap_wh(&self->_bec) / 80U;
 			
@@ -99,7 +122,8 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 
 		/* SG_ LB_New_Full_Capacity :
 		 * 	13|10@0+ (80,250) [20000|24000] "wh" Vector__XXX */
-		bite_begin(&self->_b, 13U, 10U, BITE_ORDER_DBC_0);
+		/* DBC file is incorrect or unclear about this code: */
+		/* bite_begin(&self->_b, 13U, 10U, BITE_ORDER_DBC_0);
 		full_capacity = bite_read_u16(&self->_b);
 
 		if (self->settings.capacity_override_enabled) {
@@ -112,7 +136,7 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 			bite_write_16(&self->_b, overriden);
 		}
 
-		bite_end(&self->_b);
+		bite_end(&self->_b); */
 
 		/* SG_ LB_Remaining_Capacity_Segment m1 :
 		 * 	16|4@1+ (1,0) [0|12] "dash bars" Vector__XXX */
@@ -122,20 +146,21 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		   bite_end(&self->_b);
 		   */			
 
-		self->_bms_vars.remain_capacity_wh  = remain_capacity_gids;
-		self->_bms_vars.remain_capacity_wh *= 80U;
-		
-		self->_bms_vars.full_capacity_wh   = full_capacity;
-		self->_bms_vars.full_capacity_wh  *= 80U;
-		self->_bms_vars.full_capacity_wh  += 250U;
+		if (full_capacity_mux) {
+			self->_bms_vars.full_capacity_wh  = capacity_gids;
+			self->_bms_vars.full_capacity_wh *= 80U;
+			/* self->_bms_vars.full_capacity_wh += 250U; */
+		} else {
+			self->_bms_vars.remain_capacity_wh  = capacity_gids;
+			self->_bms_vars.remain_capacity_wh *= 80U;
+		}
 
 		/*if (!self->settings.capacity_override_enabled) {
 			self->settings.capacity_override_kwh =
 				self->_bms_vars.full_capacity_wh / 1000.0f;
 		}*/
 
-		LEAF_CAN_FILTER_LOG_U16(remain_capacity_gids);
-		LEAF_CAN_FILTER_LOG_U16(full_capacity);
+		LEAF_CAN_FILTER_LOG_U16(capacity_gids);
 
 		LEAF_CAN_FILTER_LOG_U16(self->_bms_vars.remain_capacity_wh);
 		LEAF_CAN_FILTER_LOG_U16(self->_bms_vars.full_capacity_wh);

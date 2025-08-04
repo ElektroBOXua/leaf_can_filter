@@ -152,16 +152,12 @@ void bec_test()
 
 void leaf_can_filter_test_1468U(struct leaf_can_filter *self, struct bite *bi)
 {
-	uint16_t remain_capacity_gids = 0U;
-	uint16_t full_capacity        = 0U;
-	
-	float remain_capacity_kwh = 0U;
-	float full_capacity_kwh   = 0U;
+	uint16_t capacity_gids = 0U;
 
 	struct leaf_can_filter_frame frame;
 	
 	const uint8_t test_data[8] = {
-		0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00};
+		0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 	frame.id = 1468U;
 	frame.len = 8U;
@@ -174,35 +170,39 @@ void leaf_can_filter_test_1468U(struct leaf_can_filter *self, struct bite *bi)
 	/* SG_ LB_Remain_Capacity :
 	 * 	7|10@0+ (1,0) [0|500] "gids" Vector__XXX */
 	bite_begin(bi, 7U, 10U, BITE_ORDER_DBC_0);
-	remain_capacity_gids = bite_read_u16(bi);
+	capacity_gids = bite_read_u16(bi);
 	bite_end(bi);
 
-	/* SG_ LB_New_Full_Capacity :
-	 * 	13|10@0+ (80,250) [20000|24000] "wh" Vector__XXX */
-	bite_begin(bi, 13U, 10U, BITE_ORDER_DBC_0);
-	full_capacity = bite_read_u16(bi);
+	/* Real capacity reported by BMS */
+	printf("remain_capacity_wh: %u\n", self->_bms_vars.remain_capacity_wh);
+
+	/* Filtered capacity */
+	printf("remaining_capacity_filtered_wh: %u\n", capacity_gids * 80U);
+
+	assert(capacity_gids == 63U); /* Manual capacity was set */
+
+	/* set full capacity mux now*/
+	memcpy(frame.data, test_data, frame.len);
+	frame.data[5] = 0x10;
+	leaf_can_filter_process_frame(self, &frame);
+	leaf_can_filter_update(self, 0);
+	
+	bite_set_buf(bi, frame.data, frame.len);
+
+	/* SG_ LB_Remain_Capacity :
+	 * 	7|10@0+ (1,0) [0|500] "gids" Vector__XXX */
+	bite_begin(bi, 7U, 10U, BITE_ORDER_DBC_0);
+	capacity_gids = bite_read_u16(bi);
 	bite_end(bi);
 
-	/*printf("full_cap_kwh:   %f\n", bec_get_full_cap_kwh(&self->_bec));
-	  printf("remain_cap_kwh: %f\n", bec_get_remain_cap_kwh(&self->_bec));
-	  */
+	printf("full_capacity_wh: %u\n", self->_bms_vars.full_capacity_wh);
 
-	printf("remain_capacity_gids: %u\n", remain_capacity_gids);
-	printf("full_capacity:   %u\n",      full_capacity);
+	/* Filtered capacity */
+	printf("full_capacity_filtered_wh: %u\n", capacity_gids * 80U);
 
-	remain_capacity_kwh = (remain_capacity_gids * 80.0f) / 1000.0f;
-	full_capacity_kwh   = ((full_capacity * 80.0f) + 250.0f) / 1000.0f;
-
-	printf("remain_capacity_kwh: %f\n", remain_capacity_kwh);
-	printf("full_capacity_kwh:   %f\n", full_capacity_kwh);
-
-	assert(cmp_floats_with_epsilon(remain_capacity_kwh, 5.0, 0.1));
-	assert(cmp_floats_with_epsilon(full_capacity_kwh, 24.0, 0.1));
+	assert(capacity_gids == 300U);
 
 	bite_test_print_buf(frame.data);
-	/* Assert correct frame data representation */
-	assert(frame.data[0] == 0x0F && frame.data[1] == 0xD2 &&
-	       frame.data[2] == 0x8F );
 }
 
 void leaf_can_filter_test_475U(struct leaf_can_filter *self, struct bite *bi)

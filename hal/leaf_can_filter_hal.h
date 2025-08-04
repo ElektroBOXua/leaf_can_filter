@@ -268,13 +268,13 @@ bool leaf_can_filter_hal_send_frame(uint8_t bus_id,
 	if (bus_id == 0) {
 		leaf_can_filter_hal_esp32_twai_send(&twai_bus_0, frame);
 
-		can0_led = !can0_led;
-		leaf_can_filter_hal_led_update();
+		/*can0_led = !can0_led;
+		  leaf_can_filter_hal_led_update();*/
 	} else if (bus_id == 1) {
 		leaf_can_filter_hal_esp32_twai_send(&twai_bus_1, frame);
 
-		can1_led = !can1_led;
-		leaf_can_filter_hal_led_update();
+		/*can1_led = !can1_led;
+		  leaf_can_filter_hal_led_update();*/
 	} else {}
 
 	return true;
