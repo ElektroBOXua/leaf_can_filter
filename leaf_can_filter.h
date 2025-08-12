@@ -179,6 +179,11 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		voltage_V = bite_read_u16(&self->_b);
 		bite_end(&self->_b);
 
+		/* Not booted up - exit */
+		if (voltage_V == 1023) {
+			break;
+		}
+
 		/* There's an error in dbc file! Value is signed actually. */
 		/* SG_ LB_Current :
 		 * 	7|11@0+ (0.5,0) [-400|200] "A" Vector__XXX */

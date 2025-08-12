@@ -144,6 +144,13 @@ void bec_test()
 	bec_set_voltage_V(&bec, 400);
 	bec_set_current_A(&bec, 1);
 	bec_update(&bec, update_interval_ms);
+	/* LEGACY: assert(bec._cap_counts == capacity_counts);
+	 * Now we have to wait at least 5 seconds for get to 100% */
+	for (i = 0; i < 4999 - update_interval_ms; i++) {
+		bec_update(&bec, 1);
+	}
+	assert(bec._cap_counts != capacity_counts);
+	bec_update(&bec, 1);
 	assert(bec._cap_counts == capacity_counts);
 
 	printf("bec_get_soc_pct(&bec): %f\n", bec_get_soc_pct(&bec));

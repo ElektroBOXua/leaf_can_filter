@@ -20,7 +20,8 @@ struct bec
 	/* Energy counter (accumulator) */
 	int64_t _cap_counts;
 	
-	int32_t _update_timer_ms;
+	int32_t  _update_timer_ms;
+	uint32_t _full_cap_voltage_debounce_ms;
 };
 
 /******************************************************************************
@@ -51,7 +52,8 @@ void bec_init(struct bec *self)
 	self->_current_A  = 0U;
 	self->_cap_counts = 0;
 	
-	self->_update_timer_ms = 0;
+	self->_update_timer_ms              = 0;
+	self->_full_cap_voltage_debounce_ms = 0;
 }
 
 /******************************************************************************
@@ -111,12 +113,14 @@ void bec_set_update_interval_ms(struct bec *self, uint32_t val)
 /* 1V/bit precision */
 void bec_set_voltage_V(struct bec *self, int16_t val)
 {
+	/* TODO set to 0, if not called for too long after certain timeout */
 	self->_voltage_V = val;
 }
 
 /* 1A/bit precision */
 void bec_set_current_A(struct bec *self, int16_t val)
 {
+	/* TODO set to 0, if not called for too long after certain timeout */
 	self->_current_A = val;
 }
 
@@ -154,7 +158,17 @@ void bec_recalc_cap(struct bec *self)
 	self->_cap_counts += (int64_t)self->_voltage_V *
 				(int64_t)self->_current_A;
 
+	/* If voltage is higher than full capacity voltage - increment timer */
 	if (self->_voltage_V >= self->_full_cap_voltage_V) {
+		self->_full_cap_voltage_debounce_ms +=
+						     self->_update_interval_ms;
+	} else {
+		self->_full_cap_voltage_debounce_ms = 0U;
+	}
+
+	/* If voltage was higher for 5 seconds - set capacity too 100% */
+	if (self->_full_cap_voltage_debounce_ms >= 5000U) {
+		self->_full_cap_voltage_debounce_ms = 0U;
 		self->_cap_counts = capacity_counts;
 	}
 
