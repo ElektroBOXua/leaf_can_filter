@@ -180,7 +180,7 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		bite_end(&self->_b);
 
 		/* Not booted up - exit */
-		if (voltage_V == 1023) {
+		if (voltage_V == 1023U) {
 			break;
 		}
 
@@ -195,9 +195,9 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		self->_bms_vars.current_A = current_A / 2.0f;
 
 		/* Report voltage and current to our energy counter 
-		 * TODO (stop dividing by 2, bec must accept scaled values) */
-		bec_set_voltage_V(&self->_bec, voltage_V / 2U);
-		bec_set_current_A(&self->_bec, current_A / 2);
+		 * (Raw values scaled by 2x) */
+		bec_set_voltage_V(&self->_bec, voltage_V);
+		bec_set_current_A(&self->_bec, current_A);
 
 		/* Save remaining capacity into settings */
 		self->settings.capacity_remaining_kwh =
@@ -237,9 +237,10 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 	s->capacity_remaining_kwh    = 0.0f;
 	s->capacity_full_voltage_V   = 0.0f;
 
-	/* Runtime */
+	/* Other (some settings may depend on FS) */
 	bec_init(&self->_bec);
 	bec_set_update_interval_ms(&self->_bec, 10U);
+	bec_set_prescaler(&self->_bec, 2U);
 	leaf_bms_vars_init(&self->_bms_vars);
 
 	/* ... */

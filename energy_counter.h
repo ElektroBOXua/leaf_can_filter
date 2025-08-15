@@ -10,12 +10,13 @@ struct bec
 {
 	/* Config */
 	uint32_t _full_cap_wh;
-	int16_t  _full_cap_voltage_V;
+	uint16_t _full_cap_voltage_V;
 	uint32_t _update_interval_ms;
+	uint8_t  _prescaler;
 	
 	/* Runtime */
-	int16_t _voltage_V;
-	int16_t _current_A;
+	uint16_t _voltage_V;
+	int16_t  _current_A;
 
 	/* Energy counter (accumulator) */
 	int64_t _cap_counts;
@@ -27,6 +28,11 @@ struct bec
 /******************************************************************************
  * PRIVATE
  *****************************************************************************/
+int64_t _bec_get_prescaler_total(struct bec *self)
+{
+	return (self->_prescaler * self->_prescaler);
+}
+
 int64_t _bec_get_counts_per_hour(struct bec *self)
 {
 	return ((1000U / self->_update_interval_ms) * 60U * 60U);
@@ -34,7 +40,8 @@ int64_t _bec_get_counts_per_hour(struct bec *self)
 
 int64_t _bec_conv_wh_to_counts(struct bec *self, int64_t val)
 {
-	return val * _bec_get_counts_per_hour(self);
+	return val * _bec_get_counts_per_hour(self) *
+		_bec_get_prescaler_total(self);
 }
 
 /******************************************************************************
@@ -46,6 +53,7 @@ void bec_init(struct bec *self)
 	self->_full_cap_wh        = 0U;
 	self->_full_cap_voltage_V = 0U;
 	self->_update_interval_ms = 0U;
+	self->_prescaler          = 1U; /* 1x is default prescaler */
 
 	/* Runtime */
 	self->_voltage_V  = 0U;
@@ -79,6 +87,7 @@ float bec_get_full_cap_kwh(struct bec *self)
 	return bec_get_full_cap_wh(self) / 1000.0f;
 }
 
+/* Prescaler must be set before call */
 void bec_set_initial_cap_kwh(struct bec *self, float val)
 {
 	int64_t e = (int64_t)(val * 1000.0f); /* convert to watts */
@@ -89,10 +98,10 @@ void bec_set_initial_cap_kwh(struct bec *self, float val)
 
 	e = e * _bec_get_counts_per_hour(self);
 
-	self->_cap_counts = e;
+	self->_cap_counts = e * _bec_get_prescaler_total(self);
 }
 
-void bec_set_full_cap_voltage_V(struct bec *self, int16_t val)
+void bec_set_full_cap_voltage_V(struct bec *self, uint16_t val)
 {
 	self->_full_cap_voltage_V = val;
 }
@@ -106,18 +115,24 @@ void bec_set_update_interval_ms(struct bec *self, uint32_t val)
 	self->_update_timer_ms    = val;
 }
 
+/* Prescaler current and voltage will be divided (without precission loss)
+ * by this value */
+void bec_set_prescaler(struct bec *self, uint8_t val)
+{
+	self->_prescaler = val;
+}
 
 /******************************************************************************
  * RUNTIME
  *****************************************************************************/
-/* 1V/bit precision */
+/* (1V/prescaler)/bit precision */
 void bec_set_voltage_V(struct bec *self, int16_t val)
 {
 	/* TODO set to 0, if not called for too long after certain timeout */
 	self->_voltage_V = val;
 }
 
-/* 1A/bit precision */
+/* (1A/prescaler)/bit precision */
 void bec_set_current_A(struct bec *self, int16_t val)
 {
 	/* TODO set to 0, if not called for too long after certain timeout */
@@ -127,8 +142,11 @@ void bec_set_current_A(struct bec *self, int16_t val)
 /* 1W/bit precision */
 uint32_t bec_get_remain_cap_wh(struct bec *self)
 {
-	/* Divide accumulated energy to update intervals per hour */
-	return (self->_cap_counts / _bec_get_counts_per_hour(self));
+	/* Divide accumulated energy to update intervals per hour
+	 * Also divide by squared prescaler, since _cap_counts is a
+	 * product of both scaled voltage and current */
+	return (self->_cap_counts / _bec_get_counts_per_hour(self)) /
+		_bec_get_prescaler_total(self);
 }
 
 /* 1W/bit precision */
@@ -156,10 +174,11 @@ void bec_recalc_cap(struct bec *self)
 		_bec_conv_wh_to_counts(self, self->_full_cap_wh);
 
 	self->_cap_counts += (int64_t)self->_voltage_V *
-				(int64_t)self->_current_A;
+			     (int64_t)self->_current_A;
 
 	/* If voltage is higher than full capacity voltage - increment timer */
-	if (self->_voltage_V >= self->_full_cap_voltage_V) {
+	if (self->_voltage_V >=
+	    (self->_full_cap_voltage_V * self->_prescaler)) {
 		self->_full_cap_voltage_debounce_ms +=
 						     self->_update_interval_ms;
 	} else {
