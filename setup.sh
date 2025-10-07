@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 
 #SETUP tools
 if [[ ! -d "tools/" ]]; then
@@ -26,62 +27,32 @@ if [[ ! -d "libraries/" ]]; then
 	cd ..
 fi
 
+function git_simple_clone() {
+	REPO="$1"
+	VERSION="$2"
+	DIR=$(basename "$REPO" .git)
+
+	if cd "$DIR"; then
+		git pull --ff-only
+	else
+		git clone "$REPO"
+		cd "$DIR"
+	fi
+
+	git checkout "$VERSION"
+	cd ..
+}
+
 #SETUP Clone git libraries
 mkdir -p libraries
 cd libraries
-
 echo "Cloning git libraries..."
 
-REPO_URL="https://github.com/bblanchon/ArduinoJson.git"
-DEST_DIR="$(basename "$REPO_URL" .git)"
-echo "$REPO_URL"
-if [ -d "$DEST_DIR" ]; then
-	(cd "$DEST_DIR" && git pull)
-else
-	(git clone "$REPO_URL")
-fi
-
-REPO_URL="https://github.com/adafruit/Adafruit_NeoPixel.git"
-DEST_DIR="$(basename "$REPO_URL" .git)"
-echo "$REPO_URL"
-if [ -d "$DEST_DIR" ]; then
-	(cd "$DEST_DIR" && git pull)
-else
-	(git clone "$REPO_URL")
-fi
-
-REPO_URL="https://github.com/ESP32Async/AsyncTCP.git"
-DEST_DIR="$(basename "$REPO_URL" .git)"
-echo "$REPO_URL"
-if [ -d "$DEST_DIR" ]; then
-	(cd "$DEST_DIR" && git pull)
-else
-	(git clone "$REPO_URL")
-fi
-
-REPO_URL="https://github.com/ESP32Async/ESPAsyncWebServer.git"
-DEST_DIR="$(basename "$REPO_URL" .git)"
-echo "$REPO_URL"
-if [ -d "$DEST_DIR" ]; then
-	(cd "$DEST_DIR" && git pull)
-else
-	(git clone "$REPO_URL")
-fi
-
-REPO_URL="https://github.com/furdog/bitE.git"
-DEST_DIR="$(basename "$REPO_URL" .git)"
-echo "$REPO_URL"
-if [ -d "$DEST_DIR" ]; then
-	(cd "$DEST_DIR" && git pull)
-else
-	(git clone "$REPO_URL")
-fi
-pushd "$DEST_DIR" # Use certain commit
-git checkout b6d97b4341532477cfa5ea06db6dd3811e19d9b8
-popd
-
-# Clone charge_counter
-REPO='https://github.com/furdog/charge_counter.git'
-if cd `basename $REPO .git`; then git pull; cd ..; else git clone "$REPO"; fi
+git_simple_clone "https://github.com/bblanchon/ArduinoJson.git"
+git_simple_clone "https://github.com/adafruit/Adafruit_NeoPixel.git"
+git_simple_clone "https://github.com/ESP32Async/AsyncTCP.git"
+git_simple_clone "https://github.com/ESP32Async/ESPAsyncWebServer.git"
+git_simple_clone "https://github.com/furdog/bitE.git" b6d97b4341532477cfa5ea06db6dd3811e19d9b8
+git_simple_clone 'https://github.com/furdog/charge_counter.git' 'main'
 
 cd ..
