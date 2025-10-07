@@ -136,6 +136,13 @@ void leaf_can_filter_test_475U(struct leaf_can_filter *self, struct bite *bi)
 	/* Keep discharge for 2 mins, this should drop about ~5kwh 
 	 * (It's ok since current and voltage are huge) */
 	for (i = 0; i < ms_per_min * 2; i++) {
+		/* If you remove this, the test will fail.
+		 * Because vehicle will not count kwh without
+		 * incoming frames */
+		self->_b.debug = false;
+		leaf_can_filter_process_frame(self, &frame);
+		self->_b.debug = true;
+
 		leaf_can_filter_update(self, 1);
 	}
 }

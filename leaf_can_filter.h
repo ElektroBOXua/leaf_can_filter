@@ -160,10 +160,16 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 				self->_bms_vars.full_capacity_wh / 1000.0f;
 		}*/
 
+#ifdef    LEAF_CAN_FILTER_DEBUG
+		if (!self->_b.debug) {
+			break;
+		}
+
 		LEAF_CAN_FILTER_LOG_U16(capacity_gids);
 
 		LEAF_CAN_FILTER_LOG_U16(self->_bms_vars.remain_capacity_wh);
 		LEAF_CAN_FILTER_LOG_U16(self->_bms_vars.full_capacity_wh);
+#endif /* LEAF_CAN_FILTER_DEBUG */
 
 		break;
 	}
@@ -203,8 +209,14 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		self->settings.capacity_remaining_kwh =
 			chgc_get_remain_cap_kwh(&self->_chgc);
 
+#ifdef    LEAF_CAN_FILTER_DEBUG
+		if (!self->_b.debug) {
+			break;
+		}
+
 		LEAF_CAN_FILTER_LOG_U16(voltage_V);
 		LEAF_CAN_FILTER_LOG_I16(current_A);
+#endif /* LEAF_CAN_FILTER_DEBUG */
 
 		break;
 	}
