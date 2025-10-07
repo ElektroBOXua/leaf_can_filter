@@ -83,8 +83,8 @@ void leaf_can_filter_web_send_initial_msg(struct leaf_can_filter *self)
 	narr2.add(self->_bms_vars.voltage_V);
 	narr2.add(self->_bms_vars.current_A);
 	if (self->settings.capacity_override_enabled) {
-		narr2.add(bec_get_full_cap_kwh(&self->_bec));
-		narr2.add(bec_get_remain_cap_kwh(&self->_bec));
+		narr2.add(chgc_get_full_cap_kwh(&self->_chgc));
+		narr2.add(chgc_get_remain_cap_kwh(&self->_chgc));
 	} else {
 		narr2.add(self->_bms_vars.full_capacity_wh / 1000.0f);
 		narr2.add(self->_bms_vars.remain_capacity_wh / 1000.0f);
@@ -140,14 +140,14 @@ void leaf_can_filter_web_recv_msg(struct leaf_can_filter *self,
 
 	case LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_KWH:
 		self->settings.capacity_override_kwh = value.as<float>();
-		bec_set_full_cap_kwh(&self->_bec, value.as<float>());
+		chgc_set_full_cap_kwh(&self->_chgc, value.as<float>());
 		leaf_can_filter_fs_save(self);
 
 		break;
 
 	case LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_FULL_VOLTAGE_V:
 		self->settings.capacity_full_voltage_V = value.as<float>();
-		bec_set_full_cap_voltage_V(&self->_bec, value.as<float>());
+		chgc_set_full_cap_voltage_V(&self->_chgc, value.as<float>());
 		leaf_can_filter_fs_save(self);
 
 		break;

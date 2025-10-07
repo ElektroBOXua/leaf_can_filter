@@ -73,15 +73,19 @@ compile() {
 	    exit 1
 	fi
 	cd ..
+	pushd libraries/charge_counter/
+	./make.sh
+	popd
 
 
 	echo "Copying..."
 
 	# Copy all necessary files into build/
-	cp hal/*.ino                               build/build.ino
-	cp hal/*.h                                 build/
-	cp *.h                                     build/
-	cp libraries/bite/bite.h                   build/
+	cp hal/*.ino                                 build/build.ino
+	cp hal/*.h                                   build/
+	cp *.h                                       build/
+	cp libraries/bite/bite.h                     build/
+	cp libraries/charge_counter/charge_counter.h build/
 
 	echo "Building web..."
 

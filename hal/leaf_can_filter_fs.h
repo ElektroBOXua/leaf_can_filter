@@ -66,12 +66,12 @@ void leaf_can_filter_fs_load(struct leaf_can_filter *self)
 	}
 
 	/* Set capacity */
-	bec_set_full_cap_kwh(&self->_bec,
+	chgc_set_full_cap_kwh(&self->_chgc,
 			     self->settings.capacity_override_kwh);
-	bec_set_full_cap_voltage_V(&self->_bec,
+	chgc_set_full_cap_voltage_V(&self->_chgc,
 				    self->settings.capacity_full_voltage_V);
 
-	bec_set_initial_cap_kwh(&self->_bec,
+	chgc_set_initial_cap_kwh(&self->_chgc,
 			     self->settings.capacity_remaining_kwh);
 }
 
@@ -104,7 +104,7 @@ void leaf_can_filter_fs_update(struct leaf_can_filter *self,
 	/* Save remaining kwh onto flash */
 	if (self->settings.capacity_override_enabled) {
 		self->settings.capacity_remaining_kwh =
-			bec_get_remain_cap_kwh(&self->_bec);
+			chgc_get_remain_cap_kwh(&self->_chgc);
 
 		leaf_can_filter_fs_save(self);
 	}

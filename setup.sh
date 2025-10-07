@@ -76,5 +76,12 @@ if [ -d "$DEST_DIR" ]; then
 else
 	(git clone "$REPO_URL")
 fi
+pushd "$DEST_DIR" # Use certain commit
+git checkout b6d97b4341532477cfa5ea06db6dd3811e19d9b8
+popd
+
+# Clone charge_counter
+REPO='https://github.com/furdog/charge_counter.git'
+if cd `basename $REPO .git`; then git pull; cd ..; else git clone "$REPO"; fi
 
 cd ..

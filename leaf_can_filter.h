@@ -11,7 +11,7 @@
 
 #include <stdint.h>
 #include "bite.h"
-#include "energy_counter.h"
+#include "charge_counter.h"
 #include "dev_timeout_led_indicator.h"
 
 /******************************************************************************
@@ -57,7 +57,7 @@ struct leaf_can_filter_settings {
 
 struct leaf_can_filter {
 	struct bite _b;   /* bitstream manipulator */
-	struct bec  _bec; /* Energy counter */
+	struct chgc _chgc; /* Charge counter */
 
 	struct leaf_can_filter_settings settings;
 	struct leaf_bms_vars _bms_vars;
@@ -97,7 +97,7 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		if (self->settings.capacity_override_enabled &&
 		    full_capacity_mux) {
 			uint16_t overriden = 
-			      bec_get_full_cap_wh(&self->_bec) / 80U;
+			      chgc_get_full_cap_wh(&self->_chgc) / 80U;
 			
 			LEAF_CAN_FILTER_LOG_U16(overriden);
 			
@@ -109,7 +109,7 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		if (self->settings.capacity_override_enabled &&
 		    !full_capacity_mux) {
 			uint16_t overriden =
-				      bec_get_remain_cap_wh(&self->_bec) / 80U;
+				    chgc_get_remain_cap_wh(&self->_chgc) / 80U;
 			
 			LEAF_CAN_FILTER_LOG_U16(overriden);
 			
@@ -128,7 +128,7 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 
 		if (self->settings.capacity_override_enabled) {
 			uint16_t overriden = 
-			       (bec_get_full_cap_wh(&self->_bec) - 250U) / 80U;
+			     (chgc_get_full_cap_wh(&self->_chgc) - 250U) / 80U;
 
 			LEAF_CAN_FILTER_LOG_U16(overriden);
 
@@ -196,12 +196,12 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 
 		/* Report voltage and current to our energy counter 
 		 * (Raw values scaled by 2x) */
-		bec_set_voltage_V(&self->_bec, voltage_V);
-		bec_set_current_A(&self->_bec, current_A);
+		chgc_set_voltage_V(&self->_chgc, voltage_V);
+		chgc_set_current_A(&self->_chgc, current_A);
 
 		/* Save remaining capacity into settings */
 		self->settings.capacity_remaining_kwh =
-			bec_get_remain_cap_kwh(&self->_bec);
+			chgc_get_remain_cap_kwh(&self->_chgc);
 
 		LEAF_CAN_FILTER_LOG_U16(voltage_V);
 		LEAF_CAN_FILTER_LOG_I16(current_A);
@@ -217,7 +217,7 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 void _leaf_can_filter_update(struct leaf_can_filter *self,
 			     uint32_t delta_time_ms)
 {
-	bec_update(&self->_bec, delta_time_ms);
+	chgc_update(&self->_chgc, delta_time_ms);
 }
 
 /******************************************************************************
@@ -238,9 +238,9 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 	s->capacity_full_voltage_V   = 0.0f;
 
 	/* Other (some settings may depend on FS) */
-	bec_init(&self->_bec);
-	bec_set_update_interval_ms(&self->_bec, 10U);
-	bec_set_prescaler(&self->_bec, 2U);
+	chgc_init(&self->_chgc);
+	chgc_set_update_interval_ms(&self->_chgc, 10U);
+	chgc_set_multiplier(&self->_chgc, 2U);
 	leaf_bms_vars_init(&self->_bms_vars);
 
 	/* ... */

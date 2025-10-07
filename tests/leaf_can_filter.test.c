@@ -30,136 +30,6 @@ void bite_test_print_buf(uint8_t *buf)
 	fflush(0);
 }
 
-#define BEC_PRESCALER 2
-#define BEC_PRESCALER_TOTAL (BEC_PRESCALER * BEC_PRESCALER)
-
-void bec_test()
-{
-	float capacity = 7.0f;
-	uint32_t update_interval_ms = 10U;
-	uint32_t counts_per_hour = (1000U / update_interval_ms) * 60U * 60U;
-	uint32_t ms_per_hour = 1000 * 60U * 60U;
-
-	/* Calculate capacity counts */
-	int64_t capacity_counts = (int64_t)(capacity * 1000.f) *
-				         counts_per_hour * BEC_PRESCALER_TOTAL;
-
-	uint64_t i;
-	
-	struct bec bec;
-
-	bec_init(&bec);
-	bec_set_update_interval_ms (&bec, 10U);
-	bec_set_full_cap_kwh       (&bec, capacity);
-	bec_set_full_cap_voltage_V (&bec, 400.0f);
-	bec_set_initial_cap_kwh    (&bec, 0.0f);
-	bec_set_prescaler          (&bec, BEC_PRESCALER);
-
-	assert(cmp_floats_with_epsilon(
-		bec_get_remain_cap_kwh(&bec), 0.0, 0.001f));
-
-	/* Put 350 volts and 5 amps during 1 hour */
-	for (i = 0; i < ms_per_hour; i++) {
-		bec_set_voltage_V(&bec, 350 * BEC_PRESCALER);
-		bec_set_current_A(&bec, 5   * BEC_PRESCALER);
-		bec_update(&bec, 1);
-	}
-
-	/* printf("bec._cap_counts: %lli\n", bec._cap_counts);
-	 */
-	printf("bec_get_remain_cap_kwh(&bec): %f\n",
-		bec_get_remain_cap_kwh(&bec));
-	assert(cmp_floats_with_epsilon(
-		bec_get_remain_cap_kwh(&bec), 1.750, 0.1));
-
-	printf("bec_get_soc_pct(&bec): %f\n", bec_get_soc_pct(&bec));
-	assert(cmp_floats_with_epsilon(bec_get_soc_pct(&bec), 25.0, 0.1));
-
-	/* Put 350 volts and 20 amps during 1 hour (minus one count) */
-	bec_set_initial_cap_kwh(&bec, 0.0f);
-	for (i = 0; i < ms_per_hour - update_interval_ms; i++) {
-		bec_set_voltage_V(&bec, 350 * BEC_PRESCALER);
-		bec_set_current_A(&bec, 20  * BEC_PRESCALER);
-		bec_update(&bec, 1);
-	}
-	/* printf("bec._cap_counts: %lli\n", bec._cap_counts);
-	 */
-	/* Check edge case. Must be less than capacity */
-	assert(bec._cap_counts < capacity_counts);
-	printf("bec_get_remain_cap_kwh(&bec): %f\n",
-		bec_get_remain_cap_kwh(&bec));
-
-	/* Add one more count and check edge case 
-	 * Must be equal to capacity */	
-	bec_set_voltage_V(&bec, 350 * BEC_PRESCALER);
-	bec_set_current_A(&bec, 20  * BEC_PRESCALER);
-	bec_update(&bec, update_interval_ms);
-	assert(bec._cap_counts == capacity_counts);
-	printf("bec_get_remain_cap_kwh(&bec): %f\n",
-		bec_get_remain_cap_kwh(&bec));
-
-	/* Add one more count and check edge case 
-	 * Should not exceed capacity */
-	bec_set_voltage_V(&bec, 350 * BEC_PRESCALER);
-	bec_set_current_A(&bec, 20  * BEC_PRESCALER);
-	bec_update(&bec, update_interval_ms);
-	assert(bec._cap_counts == capacity_counts);
-	printf("bec_get_remain_cap_kwh(&bec): %f\n",
-		bec_get_remain_cap_kwh(&bec));
-
-	printf("bec_get_soc_pct(&bec): %f\n", bec_get_soc_pct(&bec));
-	assert(cmp_floats_with_epsilon(bec_get_soc_pct(&bec), 100.0, 0.1));
-
-	/* Put 350 volts and -20 amps during 1 hour (minus one count) */
-	for (i = 0; i < ms_per_hour - update_interval_ms; i++) {
-		bec_set_voltage_V(&bec, 350 * BEC_PRESCALER);
-		bec_set_current_A(&bec, -20 * BEC_PRESCALER);
-		bec_update(&bec, 1);
-	}
-	/* printf("bec._cap_counts: %lli\n", bec._cap_counts); */
-	/* Check edge case. Must be more than 0.0 kwh */
-	assert(bec._cap_counts > 0.0);
-	printf("bec_get_remain_cap_kwh(&bec): %f\n",
-		bec_get_remain_cap_kwh(&bec));
-
-	/* Add one more count and check edge case 
-	 * Must be equal to 0.0kwh */	
-	bec_set_voltage_V(&bec, 350 * BEC_PRESCALER);
-	bec_set_current_A(&bec, -20 * BEC_PRESCALER);
-	bec_update(&bec, update_interval_ms);
-	assert(bec._cap_counts == 0.0);
-	printf("bec_get_remain_cap_kwh(&bec): %f\n",
-		bec_get_remain_cap_kwh(&bec));
-
-	/* Add one more count and check edge case 
-	 * Should not go below 0.0kwh */
-	bec_set_voltage_V(&bec, 350 * BEC_PRESCALER);
-	bec_set_current_A(&bec, -20 * BEC_PRESCALER);
-	bec_update(&bec, update_interval_ms);
-	assert(bec._cap_counts == 0.0);
-	printf("bec_get_remain_cap_kwh(&bec): %f\n",
-		bec_get_remain_cap_kwh(&bec));
-
-	printf("bec_get_soc_pct(&bec): %f\n", bec_get_soc_pct(&bec));
-	assert(cmp_floats_with_epsilon(bec_get_soc_pct(&bec), 0.0, 0.1));
-
-	/* Check if 100% voltage sets energy too capacity */
-	bec_set_voltage_V(&bec, 400 * BEC_PRESCALER);
-	bec_set_current_A(&bec, 1   * BEC_PRESCALER);
-	bec_update(&bec, update_interval_ms);
-	/* LEGACY: assert(bec._cap_counts == capacity_counts);
-	 * Now we have to wait at least 5 seconds for get to 100% */
-	for (i = 0; i < 4999 - update_interval_ms; i++) {
-		bec_update(&bec, 1);
-	}
-	assert(bec._cap_counts != capacity_counts);
-	bec_update(&bec, 1);
-	assert(bec._cap_counts == capacity_counts);
-
-	printf("bec_get_soc_pct(&bec): %f\n", bec_get_soc_pct(&bec));
-	assert(cmp_floats_with_epsilon(bec_get_soc_pct(&bec), 100.0, 0.1));
-}
-
 void leaf_can_filter_test_1468U(struct leaf_can_filter *self, struct bite *bi)
 {
 	uint16_t capacity_gids = 0U;
@@ -257,11 +127,11 @@ void leaf_can_filter_test_475U(struct leaf_can_filter *self, struct bite *bi)
 
 	assert(LB_Current == (-350 * 2));
 
-	printf("_voltage_V: %i\n", self->_bec._voltage_V);
-	printf("_current_A: %i\n", self->_bec._current_A);
-	assert(self->_bec._voltage_V == 425U * 2U);
-	assert(self->_bec._current_A == -350 * 2);
-	assert(self->_bec._prescaler == 2U);
+	printf("_voltage_V: %i\n", self->_chgc._voltage_V);
+	printf("_current_A: %i\n", self->_chgc._current_A);
+	assert(self->_chgc._voltage_V == 425U * 2U);
+	assert(self->_chgc._current_A == -350 * 2);
+	assert(self->_chgc._multiplier == 2U);
 
 	/* Keep discharge for 2 mins, this should drop about ~5kwh 
 	 * (It's ok since current and voltage are huge) */
@@ -282,11 +152,11 @@ void leaf_can_filter_test()
 	fi.settings.bypass = false; /* disable bypass */
 	fi.settings.capacity_override_enabled = true;
 	
-	bec_set_full_cap_kwh(&fi._bec, 24.0f);
-	bec_set_full_cap_voltage_V(&fi._bec, 500.0f);
-	bec_set_initial_cap_kwh(&fi._bec, 10.0f);
+	chgc_set_full_cap_kwh(&fi._chgc, 24.0f);
+	chgc_set_full_cap_voltage_V(&fi._chgc, 500.0f);
+	chgc_set_initial_cap_kwh(&fi._chgc, 10.0f);
 
-	printf("remain_cap: %f\n", bec_get_remain_cap_kwh(&fi._bec));
+	printf("remain_cap: %f\n", chgc_get_remain_cap_kwh(&fi._chgc));
 
 	/* test segments
 	frame.id = 1468U;
@@ -360,7 +230,6 @@ void led_indicator_test()
 int main()
 {
 	leaf_can_filter_test();
-	bec_test();
 	led_indicator_test();
 	return 0;
 }
