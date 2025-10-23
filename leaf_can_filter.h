@@ -119,6 +119,22 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 
 		bite_end(&self->_b);
 
+		/* Override full capacity bars (set to 12), (doesn't work?)
+		 * SG_ LB_Remaining_Capacity_Segment m1 :
+		 * 	16|4@1+ (1,0) [0|12] "dash bars" Vector__XXX */
+		if (self->settings.capacity_override_enabled &&
+		    full_capacity_mux) {
+			frame->data[2] &= 0xF0;
+			frame->data[2] |= 0x0C;
+		}
+
+		/* Override SOH (set to 100)
+		 *  SG_ LB_Capacity_Deterioration_Rate :
+		 * 	33|7@1+ (1,0) [0|100] "%" Vector__XXX */
+		if (self->settings.capacity_override_enabled) {
+			frame->data[4] &= 0x01u;
+			frame->data[4] |= (100u << 1u);
+		}
 
 		/* SG_ LB_New_Full_Capacity :
 		 * 	13|10@0+ (80,250) [20000|24000] "wh" Vector__XXX */
