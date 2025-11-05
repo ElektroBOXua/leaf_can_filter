@@ -1,5 +1,6 @@
 #include "leaf_can_filter.h"
 #include "leaf_can_filter_web.h"
+#include "target.gen.h"
 
 /******************************************************************************
  * ESP32 TWAI
@@ -13,11 +14,22 @@
 //#define TWAI_BUS_1_TX GPIO_NUM_22
 //#define TWAI_BUS_1_RX GPIO_NUM_21
 
+#ifdef CAN_FILTER_ESP32C6_SUPER_MINI
 #define TWAI_BUS_0_TX GPIO_NUM_13
 #define TWAI_BUS_0_RX GPIO_NUM_12
 
 #define TWAI_BUS_1_TX GPIO_NUM_14
 #define TWAI_BUS_1_RX GPIO_NUM_15
+#endif
+
+#ifdef CAN_FILTER_ESP32C6_ZERO
+#warning ESP32C6_ZERO is used!
+#define TWAI_BUS_0_TX GPIO_NUM_2
+#define TWAI_BUS_0_RX GPIO_NUM_1
+
+#define TWAI_BUS_1_TX GPIO_NUM_4
+#define TWAI_BUS_1_RX GPIO_NUM_3
+#endif
 
 static twai_handle_t twai_bus_0;
 static twai_handle_t twai_bus_1;

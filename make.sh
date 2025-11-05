@@ -10,7 +10,8 @@ MONITOR_BAUD=115200
 export OTA_IP="10.10.10.10"
 
 export TARGET_NAME="LeafBOX"
-export TARGET=leaf_can_filter_esp32c6_hw1
+#export TARGET=leaf_can_filter_esp32c6_hw1
+export TARGET=leaf_can_filter_esp32c6_hw1_zero
 
 #EXTRA_FLAGS="-v"
 
@@ -21,6 +22,11 @@ export TARGET=leaf_can_filter_esp32c6_hw1
 if [ "$TARGET" == "leaf_can_filter_esp32c6_hw1" ]; then
 	BOARD=esp32:esp32:esp32c6
 	FQBN=:CDCOnBoot=cdc
+	echo "#define CAN_FILTER_ESP32C6_SUPER_MINI" > target.gen.h
+elif [ "$TARGET" == "leaf_can_filter_esp32c6_hw1_zero" ]; then
+	BOARD=esp32:esp32:esp32c6
+	FQBN=:CDCOnBoot=cdc
+	echo "#define CAN_FILTER_ESP32C6_ZERO" > target.gen.h
 else
 	echo "Bad target!"
 	exit 1
