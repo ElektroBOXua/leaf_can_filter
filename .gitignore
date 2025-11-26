@@ -1,6 +1,7 @@
 build
 tools
 libraries
+MISRA
 *.exe
 *.tmp
 *.log
