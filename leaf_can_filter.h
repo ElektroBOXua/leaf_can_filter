@@ -145,7 +145,7 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 	/* SG_ LB_Remaining_Capacity_Segment m1 :
 	 * 	16|4@1+ (1,0) [0|12] "dash bars" Vector__XXX */
 	if (self->settings.capacity_override_enabled) {
-		uint16_t overriden = 12u;
+		uint8_t overriden = 12u;
 
 		frame->data[2] &= 0xF0; /* mask: 11110000 */
 		frame->data[2] |= overriden;
@@ -286,8 +286,9 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 				((uint16_t)frame->data[1] >> 5u);
 
 		/* Check sign, if present - invert MSB */
-		if (frame->data[0] & 0x80) {
-			current_500mA |= (0xFFU << 11u);
+		if ((frame->data[0] & 0x80u) > 0u) {
+			unsigned msb_mask = (0xFFFFu << 11u);
+			current_500mA |= (int16_t)msb_mask;
 		}
 
 		self->_bms_vars.voltage_V = voltage_500mV / 2.0f;
