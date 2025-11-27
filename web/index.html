@@ -222,6 +222,8 @@ class network
 		}
 	}
 
+	_recv_test(data) { this.#recv(data) }
+
 	/* Global events (can be overriden by user) */
 	on_connect()
 	{
@@ -778,6 +780,7 @@ function status_widget_create(id, parent)
 	pane.current	     = text_create(l);
 	pane.full_cap	     = text_create(l);
 	pane.cap	     = text_create(l);
+	pane.version	     = text_create(l);
 	//pane.temp	     = text_create(l);
 	//pane.max_input_power = text_create(l);
 
@@ -795,12 +798,19 @@ function status_widget_create(id, parent)
 	net.add_listener(pane, id);
 
 	pane.net.recv = function(data) {
-		const [voltage, current, full_cap, cap] = data;
+		const [voltage, current, full_cap, cap, version] = data;
+
+		let ver_str = "unknown";
+
+		if (version <= 2) {
+			ver_str = ["unknown", "ze0", "aze0/ze1"][version];
+		}
 
 		pane.voltage.set_text("Напруга:  " + voltage + "V");
 		pane.current.set_text("Струм:    " + current + "A");
 		pane.full_cap.set_text("Ємність (повна): " + full_cap + "kWh");
 		pane.cap.set_text("Залишок: " + cap + "kWh");
+		pane.version.set_text("BMS ver. " + version + " (" + ver_str + ")");
 
 		pane.soc.set_text("Заряд (SOC): " + parseInt((cap / full_cap) * 100) + "%");
 	};
