@@ -51,6 +51,7 @@ enum leaf_can_filter_web_msg_type {
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_CPU_RESET,
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP,
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN,
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER,
 
 	LEAF_CAN_FILTER_WEB_MSG_MAX
 };
@@ -90,6 +91,7 @@ void leaf_can_filter_web_send_initial_msg(struct leaf_can_filter *self)
 		narr2.add(self->_bms_vars.remain_capacity_wh / 1000.0f);
 	}
 	narr2.add(self->_version); /* Add bms version into messages */
+	narr2.add(self->_bms_vars.soh);
 
 	narr = array.add<JsonArray>();
 	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_EN);
@@ -102,6 +104,10 @@ void leaf_can_filter_web_send_initial_msg(struct leaf_can_filter *self)
 	narr = array.add<JsonArray>();
 	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_FULL_VOLTAGE_V);
 	narr.add(self->settings.capacity_full_voltage_V);
+
+	narr = array.add<JsonArray>();
+	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER);
+	narr.add(self->settings.soh_mul);
 
 	narr = array.add<JsonArray>();
 	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN);
@@ -149,6 +155,12 @@ void leaf_can_filter_web_recv_msg(struct leaf_can_filter *self,
 	case LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_FULL_VOLTAGE_V:
 		self->settings.capacity_full_voltage_V = value.as<float>();
 		chgc_set_full_cap_voltage_V(&self->_chgc, value.as<float>());
+		leaf_can_filter_fs_save(self);
+
+		break;
+
+	case LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER:
+		self->settings.soh_mul = value.as<float>();
 		leaf_can_filter_fs_save(self);
 
 		break;

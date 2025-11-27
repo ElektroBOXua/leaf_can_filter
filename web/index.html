@@ -754,6 +754,7 @@ const LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_FULL_VOLTAGE_V = 3;
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_CPU_RESET               = 4;
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP               = 5;
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN               = 6;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER          = 7;
 
 function status_widget_create(id, parent)
 {
@@ -798,7 +799,7 @@ function status_widget_create(id, parent)
 	net.add_listener(pane, id);
 
 	pane.net.recv = function(data) {
-		const [voltage, current, full_cap, cap, version] = data;
+		const [voltage, current, full_cap, cap, version, soh] = data;
 
 		let ver_str = "unknown";
 
@@ -812,7 +813,8 @@ function status_widget_create(id, parent)
 		pane.cap.set_text("Залишок: " + cap + "kWh");
 		pane.version.set_text("BMS ver. " + version + " (" + ver_str + ")");
 
-		pane.soc.set_text("Заряд (SOC): " + parseInt((cap / full_cap) * 100) + "%");
+		pane.soc.set_text("Заряд (SOC): " + parseInt((cap / full_cap) * 100) + "% | " +
+				  "Стан (SOH): "  + parseInt(soh));
 	};
 
 	return pane;
@@ -853,6 +855,9 @@ paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_KWH, l, 4,
 
 paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_FULL_VOLTAGE_V, l, 350, 450, 4,
 		       'Напруга повного заряду');
+
+paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER, l, 0.0, 3.0, 0.1,
+		       'Встановлення множника SOH (0.0 - 3.0)');
 
 action_applier_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP, l, 'Вимкнення Wi-Fi', '&#128225',
 		      'Бажаєте вимкнути WiFi?');

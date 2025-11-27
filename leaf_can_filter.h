@@ -60,6 +60,8 @@ struct leaf_can_filter_settings {
 	float capacity_override_kwh;
 	float capacity_remaining_kwh;
 	float capacity_full_voltage_V;
+
+	float soh_mul;
 };
 
 struct leaf_can_filter {
@@ -130,14 +132,17 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 	 *  SG_ LB_Capacity_Deterioration_Rate :
 	 * 	33|7@1+ (1,0) [0|100] "%" Vector__XXX */
 	if (self->settings.capacity_override_enabled) {
-		uint16_t overriden = 100u;
+		float overriden = (float)soh_pct * self->settings.soh_mul;
+
+		if (overriden > (float)0x7Fu) {
+			overriden = (float)0x7Fu;
+		}
 
 		frame->data[4] &= 0x01u; /* mask: 00000001 */
-		frame->data[4] |= (overriden << 1u);
+		frame->data[4] |= ((uint8_t)overriden << 1u);
 
 		/* TODO do not override original read values */
-		soh_pct = overriden;
-
+		soh_pct = (uint8_t)overriden;
 	}
 
 	/* SG_ LB_Remaining_Charge_Segment m0 :
@@ -145,13 +150,21 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 	/* SG_ LB_Remaining_Capacity_Segment m1 :
 	 * 	16|4@1+ (1,0) [0|12] "dash bars" Vector__XXX */
 	if (self->settings.capacity_override_enabled) {
-		uint8_t overriden = 12u;
+		float overriden;
+
+		if (full_cap_bars_mux) {
+			overriden = 12.0;
+		} else {
+			overriden = ((((float)remain_capacity_gids /
+				       (float)full_capacity_80wh) * 12.0f) +
+				        0.5f);
+		}
 
 		frame->data[2] &= 0xF0; /* mask: 11110000 */
-		frame->data[2] |= overriden;
+		frame->data[2] |= (uint8_t)overriden;
 
 		/* TODO do not override original read values */
-		cap_bars = overriden;
+		cap_bars = (uint8_t)overriden;
 	}
 
 	self->_bms_vars.full_capacity_wh  = full_capacity_80wh;
@@ -340,6 +353,8 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 	s->capacity_override_kwh     = 0.0f;
 	s->capacity_remaining_kwh    = 0.0f;
 	s->capacity_full_voltage_V   = 0.0f;
+
+	s->soh_mul = 1.0f;
 
 	/* Other (some settings may depend on FS) */
 	chgc_init(&self->_chgc);
