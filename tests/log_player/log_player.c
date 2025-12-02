@@ -125,6 +125,7 @@ int main()
 	log_player_leaf_can_filter_init();
 
 	fi.settings.capacity_override_enabled = true;
+	fi.settings.soh_mul = 1.0f;
 	file = fopen(files[0], "r");
 	assert(file);
 	
