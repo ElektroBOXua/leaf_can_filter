@@ -92,9 +92,9 @@ uint8_t _leaf_can_filter_aze0_x5BC_get_cap_bars_overriden(
 	 * and   4bit LSB is a fraction
 	 * BARS from MSB can be calculated by the next (ceiling) formula:
 	 * 	(((0..15) * 100u) + 124u) / 125u;
-	 *
+	 * 
 	 * Since 12 is the highest possible bar count and it can not have
-	 * fraction (since there is no 13th bar to round to) the actual
+	 * fraction (there is no 13th bar to round to) the actual
 	 * max value is 240u (11110000b) */
 	if (full_cap_bars_mux) {
 		uint16_t bars = (240u * (uint16_t)soh_pct) / 100u;
@@ -195,14 +195,27 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 	/* SG_ LB_Remaining_Capacity_Segment m1 :
 	 * 	16|4@1+ (1,0) [0|12] "dash bars" Vector__XXX */
 	if (self->settings.capacity_override_enabled) {
-		float overriden;
+		uint32_t overriden;
 
 		if (full_cap_bars_mux) {
-			overriden = 12.0;
+			overriden = (12u * (uint32_t)soh_pct) / 100u;
 		} else {
-			overriden = ((((float)remain_capacity_gids /
-				       (float)full_capacity_80wh) * 12.0f) +
-				        0.5f);
+			/* 1. Calculate the Divisor's half */
+			uint16_t divisor_half =
+				self->_bms_vars.full_capacity_wh / 2u;
+
+			/* 2. Rescale value (by 12 bars) */
+			overriden = (self->_bms_vars.remain_capacity_wh * 12u);
+
+			/* 3. Add divisor_half to perform rounding */
+			overriden += divisor_half;
+
+			/* 4. Get bars rounded */
+			if (self->_bms_vars.full_capacity_wh > 0u) {
+				overriden /= self->_bms_vars.full_capacity_wh;
+			} else {
+				overriden = 0u; /* Division by zero */
+			}
 		}
 
 		frame->data[2] &= 0xF0; /* mask: 11110000 */

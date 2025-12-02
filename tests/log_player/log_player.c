@@ -126,7 +126,7 @@ int main()
 
 	fi.settings.capacity_override_enabled = true;
 	fi.settings.soh_mul = 1.0f;
-	file = fopen(files[0], "r");
+	file = fopen(files[1], "r");
 	assert(file);
 	
 	c = getc(file);
