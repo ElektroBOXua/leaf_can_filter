@@ -212,11 +212,26 @@ void _leaf_can_filter_aze0_x5BC(struct leaf_can_filter *self,
 	 * 	33|7@1+ (1,0) [0|100] "%" Vector__XXX */
 	soh_pct = frame->data[4] >> 1u;
 
-	full_cap_bars_mux = (frame->data[4] & 0x01u) == 0u;
+	/* Override SOH (set to 100) */
+	if (self->settings.capacity_override_enabled) {
+		float overriden = (float)soh_pct * self->settings.soh_mul;
+
+		if (overriden > (float)0x7Fu) {
+			overriden = (float)0x7Fu;
+		}
+
+		frame->data[4] &= 0x01u; /* mask: 00000001 */
+		frame->data[4] |= ((uint8_t)overriden << 1u);
+
+		/* TODO do not override original read values */
+		soh_pct = (uint8_t)overriden;
+	}
+
+	full_cap_bars_mux = (frame->data[4] & 0x01u);
 	cap_bars          = (frame->data[2] & 0xFFu);
 
 	if (self->settings.capacity_override_enabled) {
-		float overriden;
+		uint8_t overriden;
 
 		/* Bars is 4bit number with 0.125bit per bar (16 / 12 == 0.125)
 		 * Since integer arithmetic is used,
@@ -224,13 +239,24 @@ void _leaf_can_filter_aze0_x5BC(struct leaf_can_filter *self,
 		/* (((0..15) * 100u) + 124u) / 125u; */
 
 		if (full_cap_bars_mux) {
-			overriden = 240.0;
-		} else if ( self->_bms_vars.remain_capacity_wh > 0) {
-			overriden = ((self->_bms_vars.remain_capacity_wh *
-				      240u) /
-				     self->_bms_vars.full_capacity_wh);
+			uint16_t bars = 24u * (uint16_t)soh_pct;
+			if (bars > 240u) {
+				bars = 240u;
+			}
+
+			overriden = (uint8_t)bars;
+		} else if (self->_bms_vars.remain_capacity_wh > 0u) {
+			uint16_t bars = ((self->_bms_vars.remain_capacity_wh *
+					  240u) /
+					 self->_bms_vars.full_capacity_wh);
+
+			if (bars > 240u) {
+				bars = 240u;
+			}
+
+			overriden = (uint8_t)bars;
 		} else {
-			overriden = 0.0f; /* Division by zero */
+			overriden = 0u; /* Division by zero */
 		}
 
 		frame->data[2] &= 0x00; /* mask: 00000000 */
