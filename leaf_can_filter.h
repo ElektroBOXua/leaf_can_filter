@@ -76,6 +76,12 @@ struct leaf_can_filter {
 /******************************************************************************
  * PRIVATE
  *****************************************************************************/
+/* TODO enforce this conversion everywhere */
+uint16_t _leaf_can_filter_wh_to_gids(uint32_t wh)
+{
+	return (wh + 40u) / 80u;
+}
+
 /* OLDER < 2012 cars */
 void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 			       struct leaf_can_filter_frame *frame)
@@ -193,8 +199,8 @@ void _leaf_can_filter_aze0_x5BC(struct leaf_can_filter *self,
 
 	uint16_t soh_pct = 0U;
 
-	bool     remain_cap_bars_mux  = false; /* cap_bars: full or remain */
- 	uint8_t  cap_bars             = 0U;
+	bool     full_cap_bars_mux  = false; /* cap_bars: full or remain */
+ 	uint8_t  cap_bars           = 0U;
 
 
 	/* SG_ LB_Remain_Capacity :
@@ -206,18 +212,51 @@ void _leaf_can_filter_aze0_x5BC(struct leaf_can_filter *self,
 	 * 	33|7@1+ (1,0) [0|100] "%" Vector__XXX */
 	soh_pct = frame->data[4] >> 1u;
 
-	remain_cap_bars_mux = frame->data[4] & 0x01u;
-	cap_bars            = frame->data[2] & 0xFFu;
+	full_cap_bars_mux = (frame->data[4] & 0x01u) == 0u;
+	cap_bars          = (frame->data[2] & 0xFFu);
+
+	if (self->settings.capacity_override_enabled) {
+		float overriden;
+
+		/* Bars is 4bit number with 0.125bit per bar (16 / 12 == 0.125)
+		 * Since integer arithmetic is used,
+		 * we scale and round up values */
+		/* (((0..15) * 100u) + 124u) / 125u; */
+
+		if (full_cap_bars_mux) {
+			overriden = 240.0;
+		} else if ( self->_bms_vars.remain_capacity_wh > 0) {
+			overriden = ((self->_bms_vars.remain_capacity_wh *
+				      240u) /
+				     self->_bms_vars.full_capacity_wh);
+		} else {
+			overriden = 0.0f; /* Division by zero */
+		}
+
+		frame->data[2] &= 0x00; /* mask: 00000000 */
+		frame->data[2] |= (uint8_t)overriden;
+
+		/* TODO do not override original read values */
+		cap_bars = (uint8_t)overriden;
+	}
 
 	if (self->settings.capacity_override_enabled) {
 		uint16_t overriden;
 
 		if (full_capacity_mux) {
 			/* Override full capacity */
-			overriden = chgc_get_full_cap_wh(&self->_chgc) / 80U;
+			overriden = _leaf_can_filter_wh_to_gids(
+				chgc_get_full_cap_wh(&self->_chgc));
+
+			/* TODO do not override original read values */
+			capacity_gids = overriden;
 		} else {
 			/* Override remaining capacity */
-			overriden = chgc_get_remain_cap_wh(&self->_chgc) / 80U;				
+			overriden = _leaf_can_filter_wh_to_gids(
+				chgc_get_remain_cap_wh(&self->_chgc));
+
+			/* TODO do not override original read values */
+			capacity_gids = overriden;
 		}
 
 		frame->data[0] &= 0x00u; /* mask: 00000000 */
@@ -229,16 +268,15 @@ void _leaf_can_filter_aze0_x5BC(struct leaf_can_filter *self,
 	if (full_capacity_mux) {
 		self->_bms_vars.full_capacity_wh  = capacity_gids;
 		self->_bms_vars.full_capacity_wh *= 80U;
-		/* self->_bms_vars.full_capacity_wh += 250U; */
 	} else {
 		self->_bms_vars.remain_capacity_wh  = capacity_gids;
 		self->_bms_vars.remain_capacity_wh *= 80U;
 	}
 
-	if (remain_cap_bars_mux) {
-		self->_bms_vars.remain_cap_bars = cap_bars;
-	} else {
+	if (full_cap_bars_mux) {
 		self->_bms_vars.full_cap_bars = cap_bars;
+	} else {
+		self->_bms_vars.remain_cap_bars = cap_bars;
 	}
 
 	self->_bms_vars.soh = soh_pct;

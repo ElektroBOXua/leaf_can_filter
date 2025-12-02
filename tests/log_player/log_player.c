@@ -28,11 +28,11 @@ void log_player_leaf_can_filter_init()
 {
 	leaf_can_filter_init(&fi);
 	fi.settings.bypass = false; /* disable bypass */
-	fi.settings.capacity_override_enabled = true;
+	fi.settings.capacity_override_enabled = false;
 	
-	chgc_set_full_cap_kwh(&fi._chgc, 24.0f);
+	chgc_set_full_cap_kwh(&fi._chgc, 30.0f);
 	chgc_set_full_cap_voltage_V(&fi._chgc, 500.0f);
-	chgc_set_initial_cap_kwh(&fi._chgc, 10.0f);
+	chgc_set_initial_cap_kwh(&fi._chgc, 27.36f);
 
 	printf("\033[3J\033[H\033[2J");
 }
@@ -119,14 +119,15 @@ int main()
 		"../../logs/24_11_2025_ze0/leaf_2012_charge.csv"
 	};
 
-	FILE *file = fopen(files[1], "r");
-	
-	assert(file);
+	FILE *file;
 	
 	simple_log_reader_init(&c_inst);
-
 	log_player_leaf_can_filter_init();
 
+	fi.settings.capacity_override_enabled = true;
+	file = fopen(files[0], "r");
+	assert(file);
+	
 	c = getc(file);
 	while (!feof(file)) {
 		enum simple_log_reader_event ev;

@@ -641,7 +641,7 @@ function regulator_create(parent)
  * EXTRA
  ***********************************************/
 /** Create network instance for widgets. */
-var net = new network("10.10.10.10", 10000);
+var net = new network("@ENV:OTA_IP", 10000);
 
 function loading_create(parent)
 {

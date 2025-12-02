@@ -5,9 +5,9 @@
 ###############################################################################
 COMPILER="$PWD"/tools/arduino-cli
 
-SERIAL_PORT=COM77
+SERIAL_PORT=COM78
 MONITOR_BAUD=115200
-export OTA_IP="10.10.10.10"
+export OTA_IP="7.7.7.7"
 
 export TARGET_NAME="LeafBOX"
 export TARGET=leaf_can_filter_esp32c6_hw1

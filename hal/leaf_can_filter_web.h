@@ -262,6 +262,11 @@ static void web_server_handle_cors_preflight(AsyncWebServerRequest *request)
 				request->beginResponse(204, "text/plain");
 
 	response->addHeader("Access-Control-Allow-Origin", "*");
+
+	/* Recent */
+	response->addHeader("Access-Control-Allow-Private-Network", "true");
+	response->addHeader("Access-Control-Allow-Methods", "POST,GET,OPTIONS");
+	response->addHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
 	/* response->addHeader("Access-Control-Allow-Headers", "Content-Type,
 	 * 			X-FileSize"); */
 
@@ -337,7 +342,7 @@ void leaf_can_filter_web_init(struct leaf_can_filter *self)
 	/* AP config */
 	WiFi.mode(WIFI_AP);
 
-	WiFi.softAPConfig(IPAddress(10, 10, 10, 10), IPAddress(10, 10, 10, 10),
+	WiFi.softAPConfig(IPAddress(7, 7, 7, 7), IPAddress(7, 7, 7, 7),
 			  IPAddress(255, 255, 255, 0));
 	WiFi.softAP("LeafBOX");
 
