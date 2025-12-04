@@ -122,12 +122,14 @@ uint8_t _leaf_can_filter_aze0_x5BC_get_cap_bars_overriden(
 }
 
 /* OLDER < 2012 cars */
-void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
-			       struct leaf_can_filter_frame *frame)
+void _leaf_can_filter_ze0_x5BC_experimental(
+					struct leaf_can_filter *self,
+					struct leaf_can_filter_frame *frame)
 {
 	uint16_t remain_capacity_gids = 0U;
-	uint16_t full_capacity_80wh   = 0U;
-	uint16_t soh_pct              = 0U;
+	/*uint16_t full_capacity_80wh   = 0U;*/
+	uint16_t soc_pct = 0U;
+	uint16_t soh_pct = 0U;
 
 	bool     full_cap_bars_mux = false; /* cap_bars: full or remain */
  	uint8_t  cap_bars          = 0U;
@@ -139,8 +141,15 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 
 	/* SG_ LB_New_Full_Capacity :
 	 * 	13|10@0+ (80,250) [20000|24000] "wh" Vector__XXX */
-	full_capacity_80wh   = ((uint16_t)(frame->data[1] & 0x3Fu) << 4u) |
-			       ((uint16_t) frame->data[2]          >> 4u);
+	/*
+	 * This looks wrong, does not align with DBC file, and probably SOC
+	 * full_capacity_80wh   = ((uint16_t)(frame->data[1] & 0x3Fu) << 4u) |
+				  ((uint16_t) frame->data[2]          >> 4u);
+	*/
+	/* SG_ LB_State_Of_Charge_pct :
+	 * 	13|10@0+ (80,250) [20000|24000] "wh" Vector__XXX */
+	soc_pct = ((uint16_t)(frame->data[1] & 0x3Fu) << 4u) |
+		  ((uint16_t) frame->data[2]          >> 4u);
 
 	/* SG_ LB_Capacity_Deterioration_Rate :
 	 * 	33|7@1+ (1,0) [0|100] "%" Vector__XXX */
@@ -163,14 +172,29 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 		remain_capacity_gids = overriden;
 
 		/* Override Full capacity */
-		overriden = chgc_get_full_cap_wh(&self->_chgc) / 80U;
+		/*overriden = chgc_get_full_cap_wh(&self->_chgc) / 80U; */
+		/* frame->data[1] &= 0xC0u; */ /* mask: 11000000 */
+		/* frame->data[1] |= (overriden >> 4u); */
+		/* frame->data[2] &= 0x0Fu; */ /* mask: 00001111 */
+		/* frame->data[2] |= (overriden << 4u); */
+
+		/* Override SOC */
+		if (self->_bms_vars.full_capacity_wh > 0u) {
+			uint32_t cap = (chgc_get_remain_cap_wh(&self->_chgc) *
+					soh_pct) /
+					chgc_get_full_cap_wh(&self->_chgc);
+			overriden = (uint16_t)cap;
+		} else {
+			overriden = 0u; /* Division by zero */
+		}
+
 		frame->data[1] &= 0xC0u; /* mask: 11000000 */
 		frame->data[1] |= (overriden >> 4u);
 		frame->data[2] &= 0x0Fu; /* mask: 00001111 */
 		frame->data[2] |= (overriden << 4u);
 
 		/* TODO do not override read values */
-		full_capacity_80wh = overriden;
+		soc_pct = overriden;
 	}
 
 	/* Override SOH (set to 100)
@@ -201,18 +225,17 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 			overriden = (12u * (uint32_t)soh_pct) / 100u;
 		} else {
 			/* 1. Calculate the Divisor's half */
-			uint16_t divisor_half =
-				self->_bms_vars.full_capacity_wh / 2u;
+			uint16_t divisor_half = soh_pct / 2u;
 
 			/* 2. Rescale value (by 12 bars) */
-			overriden = (self->_bms_vars.remain_capacity_wh * 12u);
+			overriden = (uint32_t)soc_pct * 12u;
 
 			/* 3. Add divisor_half to perform rounding */
 			overriden += divisor_half;
 
 			/* 4. Get bars rounded */
-			if (self->_bms_vars.full_capacity_wh > 0u) {
-				overriden /= self->_bms_vars.full_capacity_wh;
+			if (soh_pct > 0u) {
+				overriden /= soh_pct;
 			} else {
 				overriden = 0u; /* Division by zero */
 			}
@@ -225,9 +248,14 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 		cap_bars = (uint8_t)overriden;
 	}
 
-	self->_bms_vars.full_capacity_wh  = full_capacity_80wh;
-	self->_bms_vars.full_capacity_wh *= 80U;
-	self->_bms_vars.full_capacity_wh += 250U;
+	/*if (self->settings.capacity_override_enabled) {
+		self->_bms_vars.full_capacity_wh =
+			chgc_get_full_cap_wh(&self->_chgc);
+	} else*/ {
+		self->_bms_vars.full_capacity_wh  = soc_pct;
+		self->_bms_vars.full_capacity_wh *= 80U;
+		self->_bms_vars.full_capacity_wh += 250U;
+	}
 
 	self->_bms_vars.remain_capacity_wh  = remain_capacity_gids;
 	self->_bms_vars.remain_capacity_wh *= 80U;

@@ -30,9 +30,7 @@ void log_player_leaf_can_filter_init()
 	fi.settings.bypass = false; /* disable bypass */
 	fi.settings.capacity_override_enabled = false;
 	
-	chgc_set_full_cap_kwh(&fi._chgc, 30.0f);
-	chgc_set_full_cap_voltage_V(&fi._chgc, 500.0f);
-	chgc_set_initial_cap_kwh(&fi._chgc, 27.36f);
+	chgc_set_full_cap_voltage_V(&fi._chgc, 390.0f);
 
 	printf("\033[3J\033[H\033[2J");
 }
@@ -116,7 +114,13 @@ int main()
 	char *files[] = {
 		"../../logs/aze0/ch1_20250804_161600_bypass.csv",
 		"../../logs/24_11_2025_ze0/leaf_2012_orig_start_stop.csv",
-		"../../logs/24_11_2025_ze0/leaf_2012_charge.csv"
+		"../../logs/24_11_2025_ze0/leaf_2012_charge.csv",
+		"../../logs/leaf_ze0_log/6bars.csv",          /* 3 */
+		"../../logs/leaf_ze0_log/7bars.csv",          /* 4 */
+		"../../logs/leaf_ze0_log/8bars.csv",          /* 5 */
+		"../../logs/leaf_ze0_log/10bars.csv",         /* 6 */
+		"../../logs/leaf_ze0_log/11bars141gid95.csv", /* 7 */
+		"../../logs/leaf_ze0_log/12bars95.csv"        /* 8 */
 	};
 
 	FILE *file;
@@ -124,9 +128,11 @@ int main()
 	simple_log_reader_init(&c_inst);
 	log_player_leaf_can_filter_init();
 
+	chgc_set_full_cap_kwh(&fi._chgc, 12.0f);
+	chgc_set_initial_cap_kwh(&fi._chgc, 6.0f);
 	fi.settings.capacity_override_enabled = true;
 	fi.settings.soh_mul = 1.0f;
-	file = fopen(files[1], "r");
+	file = fopen(files[7], "r");
 	assert(file);
 	
 	c = getc(file);
