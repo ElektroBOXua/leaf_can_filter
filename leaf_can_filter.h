@@ -26,8 +26,8 @@ void leaf_bms_vars_init(struct leaf_bms_vars *self)
 	self->voltage_V = 0.0f;
 	self->current_A = 0.0f;
 
-	self->remain_capacity_wh = 0U;
-	self->full_capacity_wh   = 250U;
+	self->remain_capacity_wh = 0u;
+	self->full_capacity_wh   = 0u;
 
 	self->full_cap_bars   = 0u;
 	self->remain_cap_bars = 0u;
@@ -122,14 +122,12 @@ uint8_t _leaf_can_filter_aze0_x5BC_get_cap_bars_overriden(
 }
 
 /* OLDER < 2012 cars */
-void _leaf_can_filter_ze0_x5BC_experimental(
-					struct leaf_can_filter *self,
-					struct leaf_can_filter_frame *frame)
+void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
+			       struct leaf_can_filter_frame *frame)
 {
 	uint16_t remain_capacity_gids = 0U;
-	/*uint16_t full_capacity_80wh   = 0U;*/
-	uint16_t soc_pct = 0U;
-	uint16_t soh_pct = 0U;
+	uint16_t full_capacity        = 0U;
+	uint16_t soh_pct              = 0U;
 
 	bool     full_cap_bars_mux = false; /* cap_bars: full or remain */
  	uint8_t  cap_bars          = 0U;
@@ -140,16 +138,9 @@ void _leaf_can_filter_ze0_x5BC_experimental(
 			       ((uint16_t)frame->data[1] >> 6u);
 
 	/* SG_ LB_New_Full_Capacity :
-	 * 	13|10@0+ (80,250) [20000|24000] "wh" Vector__XXX */
-	/*
-	 * This looks wrong, does not align with DBC file, and probably SOC
-	 * full_capacity_80wh   = ((uint16_t)(frame->data[1] & 0x3Fu) << 4u) |
-				  ((uint16_t) frame->data[2]          >> 4u);
-	*/
-	/* SG_ LB_State_Of_Charge_pct :
-	 * 	13|10@0+ (80,250) [20000|24000] "wh" Vector__XXX */
-	soc_pct = ((uint16_t)(frame->data[1] & 0x3Fu) << 4u) |
-		  ((uint16_t) frame->data[2]          >> 4u);
+	 * 	13|10@0+ (80,20000) [20000|24000] "wh" Vector__XXX */
+	full_capacity = ((uint16_t)(frame->data[1] & 0x3Fu) << 4u) |
+			((uint16_t) frame->data[2]          >> 4u);
 
 	/* SG_ LB_Capacity_Deterioration_Rate :
 	 * 	33|7@1+ (1,0) [0|100] "%" Vector__XXX */
@@ -160,6 +151,7 @@ void _leaf_can_filter_ze0_x5BC_experimental(
 
 	if (self->settings.capacity_override_enabled) {
 		uint16_t overriden;
+		uint32_t new_soh;
 
 		/* Override remain capacity */
 		overriden = chgc_get_remain_cap_wh(&self->_chgc) / 80U;
@@ -172,32 +164,34 @@ void _leaf_can_filter_ze0_x5BC_experimental(
 		remain_capacity_gids = overriden;
 
 		/* Override Full capacity */
-		/*overriden = chgc_get_full_cap_wh(&self->_chgc) / 80U; */
-		/* frame->data[1] &= 0xC0u; */ /* mask: 11000000 */
-		/* frame->data[1] |= (overriden >> 4u); */
-		/* frame->data[2] &= 0x0Fu; */ /* mask: 00001111 */
-		/* frame->data[2] |= (overriden << 4u); */
+		/* overriden = chgc_get_full_cap_wh(&self->_chgc) / 80U; */
 
-		/* Override SOC */
-		if (self->_bms_vars.full_capacity_wh > 0u) {
-			uint32_t cap = (chgc_get_remain_cap_wh(&self->_chgc) *
-					soh_pct) /
-					chgc_get_full_cap_wh(&self->_chgc);
-			overriden = (uint16_t)cap;
-		} else {
-			overriden = 0u; /* Division by zero */
-		}
-
+		/* We'll just set 24000wh. Since there's no way to get higher.
+		 * And we'll use SOH to adjust the actual value lower.
+		 * In old leafs SOH+fullcap is responsible for capacity bars
+		 * on display primarily and the actual full capacity bars
+		 * looks like have no effect (as far as i can say) */
+		overriden = (24000u - 20000u) / 80u;
 		frame->data[1] &= 0xC0u; /* mask: 11000000 */
 		frame->data[1] |= (overriden >> 4u);
 		frame->data[2] &= 0x0Fu; /* mask: 00001111 */
 		frame->data[2] |= (overriden << 4u);
-
 		/* TODO do not override read values */
-		soc_pct = overriden;
+		full_capacity = overriden;
+
+		/* We need to pre-override SOH to adjust full capacity,
+		 * as well as remaining capacity bars on display */
+		new_soh = (uint32_t)chgc_get_full_cap_wh(&self->_chgc) * 100u /
+			  24000u;
+
+		if (new_soh > (float)0x7Fu) {
+			new_soh = (float)0x7Fu;
+		}
+
+		soh_pct = new_soh;
 	}
 
-	/* Override SOH (set to 100)
+	/* Override SOH (again, but manually)
 	 *  SG_ LB_Capacity_Deterioration_Rate :
 	 * 	33|7@1+ (1,0) [0|100] "%" Vector__XXX */
 	if (self->settings.capacity_override_enabled) {
@@ -225,20 +219,26 @@ void _leaf_can_filter_ze0_x5BC_experimental(
 			overriden = (12u * (uint32_t)soh_pct) / 100u;
 		} else {
 			/* 1. Calculate the Divisor's half */
-			uint16_t divisor_half = soh_pct / 2u;
+			uint16_t divisor_half =
+				self->_bms_vars.full_capacity_wh / 2u;
 
 			/* 2. Rescale value (by 12 bars) */
-			overriden = (uint32_t)soc_pct * 12u;
+			overriden = (self->_bms_vars.remain_capacity_wh * 12u);
 
 			/* 3. Add divisor_half to perform rounding */
 			overriden += divisor_half;
 
 			/* 4. Get bars rounded */
-			if (soh_pct > 0u) {
-				overriden /= soh_pct;
+			if (self->_bms_vars.full_capacity_wh > 0u) {
+				overriden /= self->_bms_vars.full_capacity_wh;
 			} else {
 				overriden = 0u; /* Division by zero */
 			}
+		}
+
+		/* Clamp bars to 12 (max) */
+		if (overriden > 12u) {
+			overriden = 12u;
 		}
 
 		frame->data[2] &= 0xF0; /* mask: 11110000 */
@@ -248,14 +248,9 @@ void _leaf_can_filter_ze0_x5BC_experimental(
 		cap_bars = (uint8_t)overriden;
 	}
 
-	/*if (self->settings.capacity_override_enabled) {
-		self->_bms_vars.full_capacity_wh =
-			chgc_get_full_cap_wh(&self->_chgc);
-	} else*/ {
-		self->_bms_vars.full_capacity_wh  = soc_pct;
-		self->_bms_vars.full_capacity_wh *= 80U;
-		self->_bms_vars.full_capacity_wh += 250U;
-	}
+	self->_bms_vars.full_capacity_wh  = full_capacity;
+	self->_bms_vars.full_capacity_wh *= 80U;
+	self->_bms_vars.full_capacity_wh += 20000U;
 
 	self->_bms_vars.remain_capacity_wh  = remain_capacity_gids;
 	self->_bms_vars.remain_capacity_wh *= 80U;

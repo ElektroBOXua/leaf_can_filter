@@ -128,11 +128,11 @@ int main()
 	simple_log_reader_init(&c_inst);
 	log_player_leaf_can_filter_init();
 
-	chgc_set_full_cap_kwh(&fi._chgc, 12.0f);
+	chgc_set_full_cap_kwh(&fi._chgc, 30.0f);
 	chgc_set_initial_cap_kwh(&fi._chgc, 6.0f);
 	fi.settings.capacity_override_enabled = true;
 	fi.settings.soh_mul = 1.0f;
-	file = fopen(files[7], "r");
+	file = fopen(files[8], "r");
 	assert(file);
 	
 	c = getc(file);
