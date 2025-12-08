@@ -1,4 +1,5 @@
 #include "../../leaf_can_filter.h"
+#include "../../leafspy_can_filter.h"
 #include "simple_log_reader.h"
 
 #include <string.h>
@@ -23,14 +24,17 @@ void simple_print_frame(struct simple_log_reader *self)
 }
 
 struct leaf_can_filter fi;
+struct leafspy_can_filter lscfi;
 
 void log_player_leaf_can_filter_init()
 {
 	leaf_can_filter_init(&fi);
 	fi.settings.bypass = false; /* disable bypass */
 	fi.settings.capacity_override_enabled = false;
-	
+
 	chgc_set_full_cap_voltage_V(&fi._chgc, 390.0f);
+
+	leafspy_can_filter_init(&lscfi);
 
 	printf("\033[3J\033[H\033[2J");
 }
@@ -41,6 +45,20 @@ void leaf_can_filter_print_hex_array(char *buf, uint8_t *arr)
 		"%02X %02X %02X %02X %02X %02X %02X %02X\n",
 		arr[0], arr[1], arr[2], arr[3], arr[4], arr[5], arr[6], arr[7]
 	);
+}
+
+void leaf_can_filter_print_hex_array_len(char *buf, uint8_t *arr, uint8_t len)
+{
+	uint8_t i;
+
+	for (i = 0; i < len; i++) {
+		sprintf(buf + strlen(buf),
+			"%02X ",
+			arr[i]
+		);
+	}
+
+	sprintf(buf + strlen(buf), "\n");
 }
 
 
@@ -100,6 +118,21 @@ void leaf_can_filter_print_variables(struct leaf_can_filter_frame *df,
 
 	sprintf(buf + strlen(buf), "\033[K\n");
 
+	sprintf(buf + strlen(buf), "leafspy_soh:       %f%%                \n",
+		lscfi.lbc.soh);
+	sprintf(buf + strlen(buf), "leafspy_soc:       %f%%                \n",
+		lscfi.lbc.soc);
+	sprintf(buf + strlen(buf), "leafspy_ah:        %f                  \n",
+		lscfi.lbc.ah);
+	sprintf(buf + strlen(buf), "leafspy_dlc:       %u                  \n",
+		lscfi._tpdlc);
+	sprintf(buf + strlen(buf), "leafspy_data:      %u                  \n",
+		lscfi._tpdlc);
+	leaf_can_filter_print_hex_array_len(buf, lscfi._tpbuf, lscfi._tplen);
+
+
+	sprintf(buf + strlen(buf), "\033[K\n");
+
 	assert(strlen(buf) < (1024 * 4));
 
 	printf("%s", buf);
@@ -120,7 +153,9 @@ int main()
 		"../../logs/leaf_ze0_log/8bars.csv",          /* 5 */
 		"../../logs/leaf_ze0_log/10bars.csv",         /* 6 */
 		"../../logs/leaf_ze0_log/11bars141gid95.csv", /* 7 */
-		"../../logs/leaf_ze0_log/12bars95.csv"        /* 8 */
+		"../../logs/leaf_ze0_log/12bars95.csv",       /* 8 */
+		"../../logs/leaf_ze0_log/"
+			"ch1_20251127_195942_leaf_ze0_leafspy.csv" /* 9 */
 	};
 
 	FILE *file;
@@ -132,7 +167,7 @@ int main()
 	chgc_set_initial_cap_kwh(&fi._chgc, 6.0f);
 	fi.settings.capacity_override_enabled = true;
 	fi.settings.soh_mul = 1.0f;
-	file = fopen(files[8], "r");
+	file = fopen(files[9], "r");
 	assert(file);
 	
 	c = getc(file);
@@ -158,6 +193,8 @@ int main()
 
 			leaf_can_filter_process_frame(&fi, &f);
 			leaf_can_filter_update(&fi, (c_inst._frame.timestamp_us - prev_time_us) / 1000);
+
+			leafspy_can_filter_process_frame(&lscfi, &f);
 
 			leaf_can_filter_print_variables(&fd, &f);
 
