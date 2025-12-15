@@ -6,6 +6,7 @@
 
 #include <stdint.h>
 #include <string.h>
+#include "iso_tp.h"
 
 enum leafspy_query_type {
 	LEAFSPY_QUERY_TYPE_UNKNOWN,
@@ -24,149 +25,163 @@ struct leafspy_can_lbc {
 struct leafspy_can_filter {
 	struct leafspy_can_lbc lbc;
 
-	uint8_t _query_type;
-	uint8_t _query_num;
+	struct iso_tp iso_tp;
 
-	/* Intermediate buffer to work with multiple frames at once */
-	struct leaf_can_filter_frame _fbuf[2];
+	uint8_t _state;
 
-	/* buffer for ISO-TP frames payload */
-	uint8_t  _tpbuf[0xFFu];
-	uint16_t _tplen;
-	uint16_t _tpdlc;
+	uint32_t _full_sn;
+	uint8_t  _buf[0xFF];
+	uint8_t  _len_buf;
 };
 
 void leafspy_can_filter_init(struct leafspy_can_filter *self)
 {
+	struct iso_tp_config cfg;
+
 	self->lbc.soh = 0.0f;
 	self->lbc.soc = 0.0f;
 	self->lbc.ah  = 0.0f;
 
-	self->_query_type = LEAFSPY_QUERY_TYPE_UNKNOWN;
-	self->_query_num  = 0u;
+	iso_tp_init(&self->iso_tp);
+
+	/* Get current configuration */
+	iso_tp_get_config(&self->iso_tp, &cfg);
+
+	/* Set new configuration */
+	cfg.tx_dl = 8u; /* CAN2.0 */
+	iso_tp_set_config(&self->iso_tp, &cfg);
+
+	self->_state = 0u;
+
+	self->_full_sn  = 0u;
+	self->_len_buf = 0u;
 }
 
-void leafspy_can_filter_process_lbc_block1_answer_frame(
+void leafspy_can_filter_process_lbc_block1_answer_pdu(
 					struct leafspy_can_filter *self,
-					struct leaf_can_filter_frame *f)
+					struct iso_tp_n_pdu *n_pdu)
 {
-	if (f->data[0] == 0x24u) {
-		self->lbc.soh = ((f->data[4] << 8) | f->data[5]) / 102.4f;
+	uint8_t *d = n_pdu->n_data;
+
+	switch (self->_full_sn) {
+	case 0u:
+
+		d[2] = 0xFF;
+		d[3] = 0xFF;
+		d[4] = 0xFF;
+		d[5] = 0xDF;
+
+		iso_tp_override_n_pdu(&self->iso_tp, n_pdu);
+
+		break;
+
+	case 1u:
+		d[2] = 0xFF;
+		d[3] = 0xFF;
+		d[4] = 0xFF;
+		d[5] = 0xDF;
+
+		iso_tp_override_n_pdu(&self->iso_tp, n_pdu);
+
+		break;
+
+	case 4u:
+		self->lbc.soh = ((d[4] << 8) | d[5]) / 102.4f;
+		self->lbc.soc = (d[7] << 16u);
+
+		break;
+
+	case 5u:
+		self->lbc.soc += ((d[1] << 8u) | d[2]) / 10000.0f;
+
+		self->lbc.ah   = (d[4] << 16u | ((d[5] << 8u) | d[6])) /
+				  10000.0f;
+
+		break;
 	}
 
-	if (f->data[0] == 0x24u) {
-		self->_fbuf[0] = *f;
-	}
-
-	if (f->data[0] == 0x25u) {
-		self->lbc.soc = (self->_fbuf[0].data[7] << 16u |
-			((f->data[1] << 8u) | f->data[2])) / 10000.0f;
-
-		self->lbc.ah  = (f->data[4] << 16u |
-			((f->data[5] << 8u) | f->data[6])) / 10000.0f;
+	if ((self->_len_buf + n_pdu->len_n_data) < 0xFFu) {
+		memcpy(&self->_buf[self->_len_buf],
+			n_pdu->n_data, n_pdu->len_n_data);
+		self->_len_buf += n_pdu->len_n_data;
 	}
 }
 
-void leafspy_can_filter_dispatch_query_type(struct leafspy_can_filter *self,
-					    struct leaf_can_filter_frame *f)
+/* This is so shit... */
+void leafspy_can_filter_process_lbc_block1_frame(
+					struct leafspy_can_filter *self,
+				        struct leaf_can_filter_frame *_f)
 {
-	switch (self->_query_type) {
-	case LEAFSPY_QUERY_TYPE_LBC_BLOCK1:
-		if (f->id != 0x7BBu) {
-			break;
-		}
+	struct iso_tp_can_frame f;
 
-		/* First frame */
-		if ((f->data[0] & 0xF0u) == 0x10) {
-			self->_tpdlc  = (f->data[0] & 0x0Fu) << 8;
-			self->_tpdlc |=  f->data[1];
+	/* Prepare stuff to observe */
+	struct iso_tp_n_pdu n_pdu;
+	const uint32_t obd_id  = 0x0000079Bu;
+	const uint32_t lbc_id  = 0x000007BBu;
+	bool has_n_pdu = false;
 
-			/* Store first 6byte payload */
-			memcpy(self->_tpbuf, &f->data[2], 6u);
-			self->_tplen = 6u;			
-		} else if ((f->data[0] & 0xF0u) == 0x20u) {
-			uint8_t segment_len = (self->_tpdlc - self->_tplen);
-			segment_len = (segment_len > 7u) ? 7u : segment_len;
+	/* Copy example frame from log*/
+	f.id   = _f->id;
+	f.len  = _f->len;
+	memcpy(&f.data, _f->data, _f->len);
 
-			/* We do not really care about sequence number here */
-			/* (f->data[0] & 0x0Fu) */
-			
-			memcpy(&self->_tpbuf[self->_tplen], &f->data[1],
-			       segment_len);
-
-			self->_tplen += segment_len;
-		}
-
-		/* DLC can not be bigger than buf size */
-		if (self->_tpdlc > 0xFFu || self->_tplen >= self->_tpdlc) {
-			self->_query_type = LEAFSPY_QUERY_TYPE_UNKNOWN;
-		}
-
-		leafspy_can_filter_process_lbc_block1_answer_frame(self, f);
-		break;
-	default:
-		break;
+	if ((f.id == obd_id) || (f.id == lbc_id)) {
+		iso_tp_push_frame(&self->iso_tp, &f);
 	}
-}
 
-void leafspy_can_filter_process_frame(struct leafspy_can_filter *self,
-				      struct leaf_can_filter_frame *f)
-{
-	switch (f->id) {
-	/* LBC query */
-	case 0x79Bu: {
-		if (f->len != 8u) {
-			break;
+	iso_tp_step(&self->iso_tp, 0u);
+	has_n_pdu = iso_tp_get_n_pdu(&self->iso_tp, &n_pdu);
+
+	/* Reset on error */
+	if (iso_tp_has_cf_err(&self->iso_tp)) {
+		self->_state   = 0u;
+	}
+
+	switch (self->_state) {
+	case 0u: /* Initial state, observe request */
+		if (has_n_pdu && (f.id == obd_id) &&
+		    (n_pdu.n_pci.n_pcitype == ISO_TP_N_PCITYPE_SF) &&
+		    (n_pdu.n_pci.sf_dl == 2u) && (n_pdu.len_n_data == 2u) &&
+		    (n_pdu.n_data[0] == 0x21u && n_pdu.n_data[1] == 0x01u)) {
+			self->_full_sn = 0u;
+			self->_state   = 1u;
 		}
 
-		/* LeafSpy sends (single frame) request to the vehicle */
-		if ((self->_query_num == 0u) &&
-		   /* (SF) SingleFrame (7 - 4) == 0x00 */
-		   ((f->data[0] & 0xF0) == 0x00u) &&
+		break;
 
-		   /* (SF_DL) DLC (3 - 0) == ?? */
-		   ((f->data[0] & 0x0F) == 0x02u) && /* Expect 2 bytes */
-
-		   /* (SF_DL) DLC (3 - 0) == ?? */
-		   /* UDS Service request (0x21)
-		    * Leaf uses proprietery UDS service,
-		    * which is similar to standard UDS service 0x22 */
-		   (f->data[1] == 0x21u) &&
-
-		   /* Request LBC data */
-   		   (f->data[2] == 0x01u)
-		) {
-			self->_tpdlc = 0u;
-			self->_tplen = 0u;
-
-			self->_query_type = LEAFSPY_QUERY_TYPE_LBC_BLOCK1;
-			self->_query_num = 1u;
-		} else if (
-		  (self->_query_num == 1u) &&
-		   /* (FC) flow control (7 - 4) == 0x30 */
-		   ((f->data[0] & 0xF0) == 0x30u)
-
-		   /* (FS) Flow status  (3 - 0) */
-		   /* ((f->data[0] & 0x0F) == ??) */
-
-		/* f->data[1] == 0x00u */ /* (BS) BlockSize */
-
-		/* (STmin) SeparationTime minimum (0x0Au == 10ms) */
-		/* f->data[2] == 0x0Au */
-		) {
-			self->_query_type = LEAFSPY_QUERY_TYPE_LBC_BLOCK1;
-			self->_query_num  = 0u;
-		} else {
-			self->_query_type = LEAFSPY_QUERY_TYPE_UNKNOWN;
-			self->_query_num  = 0u;
+	case 1u: /* Initial state, observe first frame */
+		if (has_n_pdu && (f.id == lbc_id) &&
+		    (n_pdu.n_pci.n_pcitype == ISO_TP_N_PCITYPE_FF) &&
+		    (n_pdu.len_n_data == 6u)) {
+			self->_len_buf = 0u;
+			leafspy_can_filter_process_lbc_block1_answer_pdu(self,
+								       &n_pdu);
+			self->_full_sn++;
+			self->_state  = 2u;
 		}
-	
+
+		break;
+
+	case 2u: /* Observe consecutive frame */
+		if (has_n_pdu &&
+		    (n_pdu.n_pci.n_pcitype == ISO_TP_N_PCITYPE_CF) &&
+		    (n_pdu.len_n_data == 7u)) {
+			leafspy_can_filter_process_lbc_block1_answer_pdu(self,
+								       &n_pdu);
+			self->_full_sn++;
+
+			if (self->_len_buf >= n_pdu.n_pci.ff_dl) {
+				self->_state = 0u;
+			}
+		}
+		
 		break;
 	}
 
-	default:
-		break;
+	/* If frame is overriden */
+	if (iso_tp_pop_frame(&self->iso_tp, &f)) {
+		/* _f->id  = f.id;
+		   _f->len = f.len; Do not override original frame len/id?*/
+		memcpy(_f->data, &f.data, _f->len);
 	}
-
-	leafspy_can_filter_dispatch_query_type(self, f);
 }

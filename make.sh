@@ -92,6 +92,7 @@ compile() {
 	cp *.h                                       build/
 	cp libraries/bite/bite.h                     build/
 	cp libraries/charge_counter/charge_counter.h build/
+	cp libraries/iso_tp/iso_tp.h                 build/
 
 	echo "Building web..."
 

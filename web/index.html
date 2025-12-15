@@ -755,6 +755,7 @@ const LEAF_CAN_FILTER_WEB_MSG_TYPE_CPU_RESET               = 4;
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP               = 5;
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN               = 6;
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER          = 7;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY          = 8;
 
 function status_widget_create(id, parent)
 {
@@ -843,6 +844,9 @@ l = container_create(document.body);
 l.set_direction('v');
 
 status_widget_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_STATUS, l);
+
+paned_checkbox_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY, l,
+		      'Фільтрувати повідомлення LeafSpy (тест)');
 
 paned_checkbox_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN, l,
 		      'Повний обхід фільтра (bypass)');

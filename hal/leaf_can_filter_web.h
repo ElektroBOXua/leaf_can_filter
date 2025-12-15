@@ -52,6 +52,7 @@ enum leaf_can_filter_web_msg_type {
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP,
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN,
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER,
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY,
 
 	LEAF_CAN_FILTER_WEB_MSG_MAX
 };
@@ -111,6 +112,10 @@ void leaf_can_filter_web_send_initial_msg(struct leaf_can_filter *self)
 
 	narr = array.add<JsonArray>();
 	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN);
+	narr.add(self->settings.bypass);
+
+	narr = array.add<JsonArray>();
+	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY);
 	narr.add(self->settings.bypass);
 
 	serializeJson(array, serialized);
@@ -175,6 +180,11 @@ void leaf_can_filter_web_recv_msg(struct leaf_can_filter *self,
 
 	case LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN:
 		self->settings.bypass = value.as<bool>();
+		leaf_can_filter_fs_save(self);
+		return;
+
+	case LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY:
+		self->settings.filter_leafspy = value.as<bool>();
 		leaf_can_filter_fs_save(self);
 		return;
 

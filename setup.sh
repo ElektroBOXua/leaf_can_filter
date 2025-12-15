@@ -54,5 +54,6 @@ git_simple_clone "https://github.com/ESP32Async/AsyncTCP.git"
 git_simple_clone "https://github.com/ESP32Async/ESPAsyncWebServer.git"
 git_simple_clone "https://github.com/furdog/bitE.git" b6d97b4341532477cfa5ea06db6dd3811e19d9b8
 git_simple_clone 'https://github.com/furdog/charge_counter.git' v0.1.0
+git_simple_clone 'https://github.com/furdog/iso_tp.git'
 
 cd ..

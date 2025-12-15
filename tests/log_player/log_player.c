@@ -120,15 +120,28 @@ void leaf_can_filter_print_variables(struct leaf_can_filter_frame *df,
 
 	sprintf(buf + strlen(buf), "leafspy_soh:       %f%%                \n",
 		lscfi.lbc.soh);
-	sprintf(buf + strlen(buf), "leafspy_soc:       %f%%                \n",
-		lscfi.lbc.soc);
+	sprintf(buf + strlen(buf), "leafspy_soc:       %u                  \n",
+		((lscfi._buf[31] << 16) |
+		 (lscfi._buf[32] << 8) |
+		  lscfi._buf[33]));
+	sprintf(buf + strlen(buf), "leafspy_temp:      %i                  \n",
+		lscfi._buf[4] - 40);
+	sprintf(buf + strlen(buf), "leafspy_curA0:     %i                  \n",
+		((lscfi._buf[2] << 24) |
+		 (lscfi._buf[3] << 16) |
+		 (lscfi._buf[4] << 8) |
+		  lscfi._buf[5]));
+	sprintf(buf + strlen(buf), "leafspy_curA0:     %i                  \n",
+		((lscfi._buf[8] << 24) |
+		 (lscfi._buf[9] << 16) |
+		 (lscfi._buf[10] << 8) |
+		  lscfi._buf[11]));
 	sprintf(buf + strlen(buf), "leafspy_ah:        %f                  \n",
 		lscfi.lbc.ah);
 	sprintf(buf + strlen(buf), "leafspy_dlc:       %u                  \n",
-		lscfi._tpdlc);
-	sprintf(buf + strlen(buf), "leafspy_data:      %u                  \n",
-		lscfi._tpdlc);
-	leaf_can_filter_print_hex_array_len(buf, lscfi._tpbuf, lscfi._tplen);
+		lscfi._len_buf);
+	sprintf(buf + strlen(buf), "leafspy_data: ");
+	leaf_can_filter_print_hex_array_len(buf, lscfi._buf, lscfi._len_buf);
 
 
 	sprintf(buf + strlen(buf), "\033[K\n");
@@ -165,7 +178,7 @@ int main()
 
 	chgc_set_full_cap_kwh(&fi._chgc, 30.0f);
 	chgc_set_initial_cap_kwh(&fi._chgc, 6.0f);
-	fi.settings.capacity_override_enabled = true;
+	fi.settings.capacity_override_enabled = false;
 	fi.settings.soh_mul = 1.0f;
 	file = fopen(files[9], "r");
 	assert(file);
@@ -194,7 +207,7 @@ int main()
 			leaf_can_filter_process_frame(&fi, &f);
 			leaf_can_filter_update(&fi, (c_inst._frame.timestamp_us - prev_time_us) / 1000);
 
-			leafspy_can_filter_process_frame(&lscfi, &f);
+			leafspy_can_filter_process_lbc_block1_frame(&lscfi, &f);
 
 			leaf_can_filter_print_variables(&fd, &f);
 

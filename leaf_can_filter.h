@@ -53,6 +53,7 @@ struct leaf_can_filter_frame {
 
 struct leaf_can_filter_settings {
 	/* Bypass filtering completely */
+	bool filter_leafspy;
 	bool bypass;
 
 	/* Override bms capacity (enables energy counter) */
@@ -69,6 +70,7 @@ struct leaf_can_filter {
 
 	struct leaf_can_filter_settings settings;
 	struct leaf_bms_vars _bms_vars;
+	struct leafspy_can_filter lscfi;
 
 	uint8_t _version;
 };
@@ -463,7 +465,8 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 	struct leaf_can_filter_settings *s = &self->settings;
 
 	/* Settings (DEFAULT) */
-	s->bypass = true;
+	s->filter_leafspy = false;
+	s->bypass         = true;
 
 	s->capacity_override_enabled = false;
 	s->capacity_override_kwh     = 0.0f;
@@ -478,6 +481,9 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 	chgc_set_multiplier(&self->_chgc, 2U);
 	leaf_bms_vars_init(&self->_bms_vars);
 
+	/* LeafSpy ISO-TP filtering for OBD-II interface*/
+	leafspy_can_filter_init(&self->lscfi);
+
 	/* ... */
 	self->_version = LEAF_CAN_FILTER_BMS_VERSION_UNKNOWN;
 }
@@ -488,6 +494,12 @@ void leaf_can_filter_process_frame(struct leaf_can_filter *self,
 	/* Only process frame when bypass is disabled. */
 	if (self->settings.bypass == false) {
 		_leaf_can_filter(self, frame);
+
+		/* Filter LeafSpy messages */
+		if (self->settings.filter_leafspy) {
+			leafspy_can_filter_process_lbc_block1_frame(
+				&self->lscfi, frame);
+		}
 	}
 }
 
