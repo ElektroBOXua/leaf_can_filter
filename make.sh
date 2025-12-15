@@ -5,7 +5,7 @@
 ###############################################################################
 COMPILER="$PWD"/tools/arduino-cli
 
-SERIAL_PORT=COM78
+SERIAL_PORT=COM86
 MONITOR_BAUD=115200
 export OTA_IP="7.7.7.7"
 

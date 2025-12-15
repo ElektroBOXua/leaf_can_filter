@@ -51,6 +51,9 @@ struct leaf_can_filter_frame {
 	uint8_t  data[8];
 };
 
+/* leafSpy can filter depend on struct leaf_can_filter_frame */
+#include "leafspy_can_filter.h"
+
 struct leaf_can_filter_settings {
 	/* Bypass filtering completely */
 	bool filter_leafspy;
@@ -186,11 +189,11 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 		new_soh = (uint32_t)chgc_get_full_cap_wh(&self->_chgc) * 100u /
 			  24000u;
 
-		if (new_soh > (float)0x7Fu) {
-			new_soh = (float)0x7Fu;
+		if (new_soh > 0x7Fu) {
+			new_soh = 0x7Fu;
 		}
 
-		soh_pct = new_soh;
+		soh_pct = (uint16_t)new_soh;
 	}
 
 	/* Override SOH (again, but manually)
