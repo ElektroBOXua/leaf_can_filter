@@ -4,7 +4,7 @@
 #include "LittleFS.h"
 #include "leaf_can_filter.h"
 
-#define LEAF_CAN_FILTER_FS_THROTTLE_TIME_MS 10000
+#define LEAF_CAN_FILTER_FS_THROTTLE_TIME_MS 60000
 
 /******************************************************************************
  * GLOBALS
