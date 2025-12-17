@@ -24,7 +24,7 @@ MSB -> 28,     29: (uint16_t)hx /* in LeafSpy */
 MSB -> 31,     33: (uint24_t)soc_pct /* in LeafSpy */
        34        : /* Unknown purpose (not found during survey) */
 MSB -> 35,     36: (uint16_t)ah /* in LeafSpy */
-MSB -> 37, ... 40: /* Unknown purpose (not found during survey) */
+       37, ... 40: /* Unknown purpose (not found during survey) */
 ```
 
 ## To-Do List

@@ -118,24 +118,16 @@ void leaf_can_filter_print_variables(struct leaf_can_filter_frame *df,
 
 	sprintf(buf + strlen(buf), "\033[K\n");
 
-	sprintf(buf + strlen(buf), "leafspy_soh:       %f%%                \n",
-		lscfi.lbc.soh);
 	sprintf(buf + strlen(buf), "leafspy_soc:       %u                  \n",
 		((lscfi._buf[31] << 16) |
 		 (lscfi._buf[32] << 8) |
 		  lscfi._buf[33]));
 	sprintf(buf + strlen(buf), "leafspy_temp:      %i                  \n",
 		lscfi._buf[4] - 40);
-	sprintf(buf + strlen(buf), "leafspy_curA0:     %i                  \n",
-		((lscfi._buf[2] << 24) |
-		 (lscfi._buf[3] << 16) |
-		 (lscfi._buf[4] << 8) |
-		  lscfi._buf[5]));
-	sprintf(buf + strlen(buf), "leafspy_curA0:     %i                  \n",
-		((lscfi._buf[8] << 24) |
-		 (lscfi._buf[9] << 16) |
-		 (lscfi._buf[10] << 8) |
-		  lscfi._buf[11]));
+	sprintf(buf + strlen(buf), "leafspy_curA0:     %f                  \n",
+		lscfi.lbc.current0_A);
+	sprintf(buf + strlen(buf), "leafspy_curA1:     %f                  \n",
+		lscfi.lbc.current1_A);
 	sprintf(buf + strlen(buf), "leafspy_ah:        %f                  \n",
 		lscfi.lbc.ah);
 	sprintf(buf + strlen(buf), "leafspy_dlc:       %u                  \n",

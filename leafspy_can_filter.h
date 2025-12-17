@@ -16,9 +16,15 @@ enum leafspy_query_type {
 
 /** Leafspy CAN filter lbc group 1 messages */
 struct leafspy_can_lbc {
-	float soh; /* State of health */
-	float soc; /* State of charge */
-	float ah;  /* Amper Hours */
+	float current0_A;
+	float current1_A;
+
+	float voltage_V;
+
+	float hx;
+
+	float soc;
+	float ah;
 };
 
 /** Leafspy CAN filter. Intercepts leafspy queries and
@@ -43,7 +49,6 @@ void leafspy_can_filter_init(struct leafspy_can_filter *self)
 {
 	struct iso_tp_config cfg;
 
-	self->lbc.soh = 0.0f;
 	self->lbc.soc = 0.0f;
 	self->lbc.ah  = 0.0f;
 
@@ -87,38 +92,43 @@ void leafspy_can_filter_process_lbc_block1_answer_pdu(
 	} else {}
 
 	switch (self->_full_sn) {
-	/*case 0u:
+	case 0u: {
+		int32_t current_raw = 0u;
 
-		d[2] = 0xFF;
-		d[3] = 0xFF;
-		d[4] = 0xFF;
-		d[5] = 0xDF;
+		current_raw |= (d[2] << 24u);
+		current_raw |= (d[3] << 16u);
+		current_raw |= (d[4] << 8u);
+		current_raw |= (d[5] << 0u);
 
-		iso_tp_override_n_pdu(&self->iso_tp, n_pdu);
+		self->lbc.current0_A = (float)current_raw / 1000.0f;
 
 		break;
+	}
 
-	case 1u:
-		d[2] = 0xFF;
-		d[3] = 0xFF;
-		d[4] = 0xFF;
-		d[5] = 0xDF;
+	case 1u: {
+		int32_t current_raw = 0u;
 
-		iso_tp_override_n_pdu(&self->iso_tp, n_pdu);
+		current_raw |= (d[2] << 24u);
+		current_raw |= (d[3] << 16u);
+		current_raw |= (d[4] << 8u);
+		current_raw |= (d[5] << 0u);
 
-		break;*/
+		self->lbc.current1_A = (float)current_raw / 1000.0f;
+
+		break;
+	}
 
 	case 4u:
-		self->lbc.soh = ((d[4] << 8) | d[5]) / 102.4f;
-		self->lbc.soc = (d[7] << 16u);
+		/*self->lbc.soh = ((d[4] << 8) | d[5]) / 102.4f;
+		self->lbc.soc = (d[7] << 16u);*/
 
 		break;
 
 	case 5u:
-		self->lbc.soc += ((d[1] << 8u) | d[2]) / 10000.0f;
+		/*self->lbc.soc += ((d[1] << 8u) | d[2]) / 10000.0f;
 
 		self->lbc.ah   = (d[4] << 16u | ((d[5] << 8u) | d[6])) /
-				  10000.0f;
+				  10000.0f;*/
 
 		break;
 	}
