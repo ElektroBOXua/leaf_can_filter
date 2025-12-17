@@ -92,7 +92,7 @@ void leafspy_can_filter_process_lbc_block1_answer_pdu(
 	} else {}
 
 	switch (self->_full_sn) {
-	case 0u: {
+	case 0u: { /* 0 ... 5 */
 		int32_t current_raw = 0u;
 
 		current_raw |= (d[2] << 24u);
@@ -105,7 +105,7 @@ void leafspy_can_filter_process_lbc_block1_answer_pdu(
 		break;
 	}
 
-	case 1u: {
+	case 1u: { /* 6 ... 12 */
 		int32_t current_raw = 0u;
 
 		current_raw |= (d[2] << 24u);
@@ -118,18 +118,19 @@ void leafspy_can_filter_process_lbc_block1_answer_pdu(
 		break;
 	}
 
-	case 4u:
-		/*self->lbc.soh = ((d[4] << 8) | d[5]) / 102.4f;
-		self->lbc.soc = (d[7] << 16u);*/
-
+	case 2u: /* 13 ... 19 */
 		break;
 
-	case 5u:
-		/*self->lbc.soc += ((d[1] << 8u) | d[2]) / 10000.0f;
-
-		self->lbc.ah   = (d[4] << 16u | ((d[5] << 8u) | d[6])) /
-				  10000.0f;*/
-
+	case 3u: /* 20 ... 26 */
+		self->lbc.voltage_V = ((d[0] << 8) | d[1]) / 100.0f;
+		break;
+	case 4u: /* 27 ... 33 */
+		self->lbc.hx  = ((d[1] << 8) | d[2]) / 100.0f;
+		self->lbc.soc = ((d[4] << 16u) | (d[5] << 8u) | d[6]) /
+				10000.0f;
+		break;
+	case 5u: /* 34 ... 40 */
+		self->lbc.ah = ((d[1] << 8) | d[2]) / 39.0f; /* Weird */
 		break;
 	}
 

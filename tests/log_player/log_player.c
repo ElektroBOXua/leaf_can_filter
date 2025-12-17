@@ -128,6 +128,12 @@ void leaf_can_filter_print_variables(struct leaf_can_filter_frame *df,
 		lscfi.lbc.current0_A);
 	sprintf(buf + strlen(buf), "leafspy_curA1:     %f                  \n",
 		lscfi.lbc.current1_A);
+	sprintf(buf + strlen(buf), "leafspy_volt_V:    %f                  \n",
+		lscfi.lbc.voltage_V);
+	sprintf(buf + strlen(buf), "leafspy_hx:        %f                  \n",
+		lscfi.lbc.hx);
+	sprintf(buf + strlen(buf), "leafspy_soc:       %f                  \n",
+		lscfi.lbc.soc);
 	sprintf(buf + strlen(buf), "leafspy_ah:        %f                  \n",
 		lscfi.lbc.ah);
 	sprintf(buf + strlen(buf), "leafspy_dlc:       %u                  \n",
@@ -199,8 +205,8 @@ int main()
 			leaf_can_filter_process_frame(&fi, &f);
 			leaf_can_filter_update(&fi, (c_inst._frame.timestamp_us - prev_time_us) / 1000);
 
-			/*lscfi.filter_leafspy_idx  = 40u -7u;
-			  lscfi.filter_leafspy_byte = 0xAAu;*/
+			/*lscfi.filter_leafspy_idx  = 35u;
+			  lscfi.filter_leafspy_byte = 0x02u;*/
 			leafspy_can_filter_process_lbc_block1_frame(&lscfi, &f);
 
 			leaf_can_filter_print_variables(&fd, &f);
