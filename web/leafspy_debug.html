@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle Status Dashboard</title>
+    
+    <style>
+		* :not(title):not(style):not(script) {
+	display: flex;
+	flex-direction: column;
+	font-family: monospace;
+	/* font-weight: bold; */
+	color: white;
+	white-space: nowrap;
+	font-size: calc(1vmin + 1vmax);
+	min-width: fit-content;
+	user-select: none;
+}
+
+html {
+    -ms-touch-action: manipulation;
+        touch-action: manipulation;
+}
+
+body {
+	flex-direction: row !important;
+	flex-wrap: wrap !important;
+	background: linear-gradient(45deg, black, rgb(32, 75, 80));
+	background-attachment: fixed;
+	background: rgb(45, 45, 45);
+}
+
+.lay {
+	flex: 1;
+	flex-wrap: wrap;
+}
+
+@keyframes slide_left {
+	0% {margin: 10em}
+}
+
+.pane {
+	animation: 1s ease-out 0s 1 slide_left;
+	flex: 1 1 0em;
+	border-radius: 1em;
+	background: rgb(15, 15, 15);
+	margin: 0.5em;
+	box-shadow: rgb(0 0 0) 0.1em 0.1em 0.5em;
+}
+
+.pane_capt {
+	align-items: center;
+	border-radius: 1em;
+	flex-direction: row;
+	background: linear-gradient(90deg, black, transparent);
+}
+
+.pane_text {
+	padding: 0.2em;
+	font-size: 2em;
+}
+
+.pane_tool {
+	margin-left: auto;
+}
+
+.pane_cont {
+	flex-wrap: wrap;
+	flex-direction: row;
+	align-items: end;
+	min-height: 1em;
+}
+
+.text {
+	padding: 1em;
+}
+
+.field {
+	flex: 1;
+	color: #000000;
+	text-align-last: center;
+	font-size: 2em;
+	border-radius: 1em;
+	margin: 0.25em;
+}
+
+.button {
+	background: rgb(45, 45, 45);
+	padding: 0.5em;
+	border-radius: 1em;
+	margin: 0.5em;
+	width: -moz-available;
+	width: -webkit-fill-available;
+	min-width: 4em;
+	align-items: center;
+}
+
+.button:active {
+	background: linear-gradient(270deg, black, red);
+}
+
+@keyframes blur_anim {
+	to {
+		border-radius: unset;
+		backdrop-filter: blur(2px) brightness(0.75) grayscale(0.75);
+	}
+}
+
+.blur {
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	position: fixed;
+	
+	animation: blur_anim 1s forwards;
+}
+
+.popup {
+	position: fixed;
+	width: fit-content;
+	height: fit-content;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+}
+
+.regulator {
+	flex-wrap: nowrap;
+	flex: 1;
+}
+
+.lds-dual-ring:after {
+	content: " ";
+	display: block;
+	width: 64px;
+	height: 64px;
+	margin: 8px;
+	border-radius: 50%;
+	border: 6px solid #fff;
+	border-color: #fff transparent #fff transparent;
+	animation: lds-dual-ring 1.2s linear infinite;
+}
+@keyframes lds-dual-ring {
+	0% {
+		transform: rotate(0deg);
+	}
+	100% {
+		transform: rotate(360deg);
+	}
+}
+</style>
+</head>
+
+<body>
+</body>
+
+<script>
+/******************************************************************************
+ * NETWORK
+ *****************************************************************************/
+class network
+{
+	#ws; /* Websocket */
+
+	/* If there are no messages for certain period */
+	#connection_timeout_ms = 0; /* No timeout */
+	#connection_timer;
+	
+	#is_alive     = false;
+	#is_connected = false;
+
+	#listeners = {}; /* Objects that listen network messages */
+
+	/* Prevents connection timeout, when timeout is set */
+	#keep_alive()
+	{
+		clearTimeout(this.#connection_timer);
+		this.#is_alive = true;
+
+		this.#connection_timer = setTimeout(() => {
+			if (this.#is_alive == true) {
+				this.on_timeout();
+			}
+
+			this.#is_alive = false;
+
+			this.#ws.close();
+		}, this.#connection_timeout_ms);
+	}
+
+	#send(id, data)
+	{
+		console.log(this.constructor.name + '.send: ' + id + ', ' +
+								data);
+
+		this.#ws.send(JSON.stringify([ id, data ]));
+	};
+
+	#recv(data)
+	{
+		console.log(this.constructor.name + '.recv: ' + data);
+		data = JSON.parse(data);
+
+		/* if it contains single message */
+		if (typeof (data[0]) != "object") {
+			const listener = this.#listeners[data[0]];
+
+			listener.net.recv.call(listener, data[1]);
+		} else {
+			/* if it contains multiple messages */
+			for (var i = 0; i < data.length; i++) {
+				const listener = this.#listeners[data[i][0]];
+
+				listener.net.recv.call(listener, data[i][1]);
+			};
+		}
+
+		if (this.#connection_timeout_ms > 0) {
+			this.#keep_alive();
+		}
+	}
+
+	_recv_test(data) { this.#recv(data) }
+
+	/* Global events (can be overriden by user) */
+	on_connect()
+	{
+		console.log(this.constructor.name + '.on_connect')
+	};
+	
+	on_disconnect()
+	{
+		console.log(this.constructor.name + '.on_disconnect')
+	};
+	
+	on_timeout()
+	{
+		console.log(this.constructor.name + '.on_timeout')
+	};
+	
+	on_error()
+	{
+		console.log(this.constructor.name + '.on_error')
+	};
+	
+	on_message(data) {
+		console.log(this.constructor.name + '.on_message')
+	};
+
+	connect(ip, timeout)
+	{
+		this.#connection_timeout_ms = timeout;
+
+		this.#ws = new WebSocket('ws://' + ip + '/ws');
+
+		this.#ws.onopen = (evt) =>
+		{
+			this.#is_connected = true;
+
+			if (this.#connection_timeout_ms > 0) {
+				this.#keep_alive();
+			}
+
+			this.on_connect();
+		};
+
+		this.#ws.onclose = (evt) =>
+		{
+			if (this.#is_connected == true) {
+				this.#is_connected = false;
+				this.on_disconnect();
+			}
+
+			/* Destroy websocket */
+			this.#ws = null;
+
+			this.connect(ip, timeout);
+		};
+
+		this.#ws.onerror = (evt) =>
+		{
+			if (this.#is_connected == true) {
+				this.on_error();
+			}
+		};
+		
+		this.#ws.onmessage = (evt) =>
+		{
+			this.on_message(evt.data)
+			this.#recv(evt.data);
+		};
+	}
+
+	/* Add message listener to object */
+	add_listener(object, id)
+	{
+		const base = this;
+
+		this.#listeners[id] = object;
+		object.net = {};
+
+		/* Can be overriden by user */
+		object.net.recv = function(data) {
+			console.log(id + '.dataset.net.recv: ' + data);
+		};
+
+		/* Shall NOT be overriden by user */
+		object.net.send = function(data) {
+			base.#send(id, data);
+		};
+	};
+
+	constructor(ip, timeout)
+	{
+		this.connect(ip, timeout);
+	}
+}
+
+/******************************************************************************
+ * WIDGETS
+ *****************************************************************************/
+function generic_create(parent, class_name, tag)
+{
+	/** Head object. */
+	const head     = document.createElement(tag ? tag : 'div');
+	head.className = class_name;
+	parent.appendChild(head);
+
+	/** Nested objects. */
+	head.click_actions   = {};
+	head.hold_actions    = {};
+	head.release_actions = {};
+	head.keydown_actions = {};
+
+	/** Methods. */
+	head.hide = function(
+	    val) { head.style.visibility = val ? "hidden" : "" };
+
+	head.set_background = function(val) { head.style.background = val };
+
+	head.set_text = function(val) { head.innerHTML = val };
+
+	head.set_size = function(val) {
+		if (val)
+			head.style.fontSize = val + 'em';
+	};
+
+	head.set_direction = function(
+	    val) { head.style.flexDirection = (val == 'h') ? 'row' : 'column' };
+
+	head.onclick = function(e) {
+		//e.stopPropagation();
+
+		for (const key in head.click_actions)
+			head.click_actions[key]();
+	};
+
+	head.onkeydown = function(e) {
+		e.stopPropagation();
+
+		for (const key in head.keydown_actions)
+			head.keydown_actions[key](e.key);
+	};
+
+	const hold_event =
+	    function(e) {
+		e.stopPropagation();
+
+		for (const key in head.hold_actions)
+			head.hold_actions[key]();
+	}
+
+	const release_event = function(e) {
+		e.stopPropagation();
+
+		for (const key in head.release_actions)
+			head.release_actions[key]();
+	};
+
+	/* Fix for mobile devices. */
+	if (!head.ontouchstart)
+		head.onmousedown = hold_event;
+	else
+		head.ontouchstart = hold_event;
+
+	if (!head.ontouchend)
+		head.onmouseup = release_event;
+	else
+		head.ontouchend = release_event;
+
+	return head;
+};
+
+function field_create(parent)
+{
+	/** Head object. */
+	const head = generic_create(parent, 'field', 'input');
+	head.type  = 'text';
+
+	/** Methods. */
+	head.set_type  = function(val) { head.type = val };
+	head.set_min   = function(val) { head.min = val };
+	head.set_max   = function(val) { head.max = val };
+	head.set_step  = function(val) { head.step = val };
+	head.set_value = function(val) { head.value = val };
+
+	return head;
+};
+
+function text_create(parent)
+{
+	/** Head object. */
+	const head = generic_create(parent, 'text');
+
+	return head;
+};
+
+function container_create(parent)
+{
+	/** Head object. */
+	const head = generic_create(parent, 'lay');
+
+	return head;
+};
+
+function pane_create(parent)
+{
+	/** Head object. */
+	const head = generic_create(parent, 'pane');
+
+	/** Nested objects. */
+	head.caption = generic_create(head, 'pane_capt');
+	head.text    = text_create(head.caption);
+	head.toolbar = generic_create(head.caption, 'pane_tool');
+	head.content = container_create(head);
+
+	/** Modified classes. */
+	head.text.className    = 'pane_text';
+	head.content.className = 'pane_cont';
+
+	return head;
+};
+
+function popup_create(parent)
+{
+	/** Head object. */
+	const head = generic_create(parent, 'blur');
+
+	/** Private objects. */
+	const popup = pane_create(head);
+
+	/** Nested objects. */
+	head.caption = popup.caption;
+	head.text    = popup.text;
+	head.content = popup.content;
+
+	/** Modified classes. */
+	popup.classList.add('popup');
+
+	return head;
+};
+
+function button_create(parent)
+{
+	/** Head object. */
+	const head = text_create(parent);
+
+	/** Modified classes. */
+	head.className = 'button';
+
+	return head;
+};
+
+function checkbox_create(parent)
+{
+	/** Head object. */
+	const head = button_create(parent);
+
+	/** Methods. */
+	head.set_state = function(state) {
+		head.state = state;
+
+		if (state) {
+			head.set_background('#113311');
+			head.set_text('&#10003');
+		} else {
+			head.set_background('#331111');
+			head.set_text('&#10007');
+		};
+	};
+
+	head.click_actions.default_action =
+	    function() { head.set_state(!head.state); }
+
+	    head.set_state(head.state);
+	return head;
+};
+
+function manual_input_create(parent)
+{
+	/** Head object. */
+	const head = popup_create(document.body);
+	head.text.set_text('Ввести значення');
+
+	/** Nested objects. */
+	head.field  = field_create(head.content);
+	head.button = button_create(head.content);
+	head.button.set_text('Встановити');
+
+	/** Methods. */
+	head.button.click_actions.default_action = function() { head.remove() };
+
+	head.field.keydown_actions.default_action = function(key) {
+		if (key === 'Enter')
+			head.button.onclick();
+	};
+
+	return head;
+};
+
+function regulator_create(parent)
+{
+	/** Head object. */
+	const head = container_create(parent);
+	head.set_direction('h');
+
+	/** Private objects. */
+	var digits = 2;
+	var format = 'numeric';
+	var min	   = 0;
+	var max	   = 0;
+	var step   = 0;
+	var value  = 0;
+
+	var timer = 0;
+	var accel = 1;
+	var dir	  = 1;
+
+	/** Nested objects. */
+	head.decrement = button_create(head);
+	head.decrement.set_text('<');
+	head.value     = button_create(head);
+	head.increment = button_create(head);
+	head.increment.set_text('>');
+
+	/** Modified classes. */
+	head.classList.add('regulator');
+
+	/** Methods. */
+	head.on_change = function() {};
+
+	head.get_value = function() { return value };
+
+	head.set_min   = function(val) { min = val };
+	head.set_max   = function(val) { max = val };
+	head.set_step  = function(val) { step = val };
+	head.set_value_force = function(val) {
+		value = parseFloat(val);
+
+		/** Display text depend on format. */
+		if (format == 'percentage')
+			head.value.set_text((value * 100).toFixed(digits) +
+					    '%');
+		else
+			head.value.set_text(value.toFixed(digits));
+	};
+	head.set_value = function(val) {
+		value = parseFloat(val);
+
+		/** Validate bounds. */
+		if (value > max)
+			value = max;
+
+		if (value < min)
+			value = min;
+
+		head.set_value_force(value);
+	};
+
+	head.set_format = function(fmt) {
+		format = fmt;
+		head.set_value_force(value);
+	};
+
+	head.manual_input = function() {
+		const input = manual_input_create(head);
+
+		input.field.set_type('number');
+		input.field.set_min(min);
+		input.field.set_max(max);
+		input.field.set_step(step);
+		input.field.set_value(value.toFixed(digits));
+
+		input.button.click_actions.set_value = function() {
+			head.set_value(input.field.value);
+			head.on_change();
+		};
+	};
+
+	head.accelerate = function() {
+		head.set_value(value + step * dir);
+
+		timer = setInterval(function() {
+			accel += 0.5;
+			clearInterval(timer);
+			head.accelerate();
+		}, 1000 / accel);
+	};
+
+	head.increment.hold_actions.default_action = function() {
+		dir = 1;
+		head.accelerate();
+	};
+
+	head.increment.release_actions.default_action = function() {
+		clearInterval(timer);
+		accel = 1;
+		head.on_change();
+	};
+
+	head.decrement.hold_actions.default_action = function() {
+		dir = -1;
+		head.accelerate();
+	};
+
+	head.decrement.release_actions.default_action = function() {
+		clearInterval(timer);
+		accel = 1;
+		head.on_change();
+	};
+
+	head.value.click_actions.default_action =
+	    function() { head.manual_input() };
+
+	return head;
+};
+
+/************************************************
+ * EXTRA
+ ***********************************************/
+/** Create network instance for widgets. */
+/* var net = new network("@ENV:OTA_IP", 10000); */
+var net = new network("7.7.7.7", 10000);
+
+function loading_create(parent)
+{
+	return generic_create(parent, 'lds-dual-ring');
+};
+
+/* PANED REGULATOR */
+function paned_regulator_create(id, parent, rmin, rmax, rstep, caption)
+{
+	const pane	= pane_create(parent);
+	var   regulator = regulator_create(pane.content);
+
+	pane.text.set_text(caption);
+	pane.content.regulator = regulator;
+
+	regulator.set_min(rmin);
+	regulator.set_max(rmax);
+	regulator.set_step(rstep);
+	regulator.set_value(rmin);
+
+	net.add_listener(regulator, id);
+
+	regulator.on_change = function() {
+		regulator.net.send(regulator.get_value()) };
+
+	regulator.net.recv = function(data) {
+		pane.content.regulator.set_value_force(JSON.parse(data)) };
+
+	return pane;
+};
+
+/* PANED CHECKBOX */
+function paned_checkbox_create(id, parent, caption)
+{
+	const pane     = pane_create(parent);
+	var   checkbox = checkbox_create(pane.content);
+
+	pane.text.set_text(caption);
+	pane.content.checkbox = checkbox;
+
+	net.add_listener(checkbox, id);
+
+	checkbox.click_actions.send =
+	    function() { checkbox.net.send(checkbox.state ? 1 : 0) };
+
+	checkbox.net.recv = function(data) {
+		checkbox.set_state(JSON.parse(data)) };
+
+	return pane;
+};
+
+/* ACTION APPLIER */
+function action_applier_create(id, parent, caption, toolbar, confirmation_text)
+{
+	const pane = pane_create(parent);
+	const stop = button_create(pane);
+
+	pane.text.set_text(caption);
+	
+	pane.toolbar.set_text(toolbar);
+	pane.toolbar.set_size(3);
+	
+	stop.set_text('Запит на підтвердження');
+
+	stop.click_actions.show_dialog = function() {
+		const popup = popup_create(document.body);
+		const yes   = button_create(popup.content);
+		const no    = button_create(popup.content);
+
+		popup.text.set_text(confirmation_text);
+		popup.content.style.flexWrap = 'nowrap';
+
+		net.add_listener(yes, id);
+		yes.set_text('Так');
+		yes.click_actions.click = function() { popup.remove() };
+		yes.click_actions.send	= function() { yes.net.send() };
+
+		no.set_text('Ні');
+		no.click_actions.click = function() { popup.remove() };
+	};
+};
+
+/* On disconnect */
+net.on_disconnect = function() {
+	const p	   = popup_create(document.body);
+	const t	   = text_create(p.content);
+	const l	   = loading_create(p.content);
+	const t2   = text_create(p.content);
+	const exit = button_create(p.content);
+
+	p.text.set_text("Помилка");
+	p.content.style.alignItems = "center";
+	p.content.set_direction("v");
+	t.set_text("Відсутня мережа");
+	t2.set_text("Спроба повторного підключення...");
+
+	exit.set_text('Приховати діалог')
+	exit.click_actions.click = function() { p.remove() };
+
+	net.on_connect = function() { p.remove() };
+}
+
+/************************************************
+ * MAIN CODE
+ ***********************************************/
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_STATUS                  = 0;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_EN    = 1;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_KWH   = 2;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_FULL_VOLTAGE_V = 3;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_CPU_RESET               = 4;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP               = 5;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN               = 6;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER          = 7;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY          = 8;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_IDX  = 9;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_BYTE = 10;
+
+function status_widget_create(id, parent)
+{
+	const pane = pane_create(parent);
+	pane.text.set_text('Статус');
+
+	/* Central subcontainer */
+	const s	= container_create(pane);
+	s.set_direction('h');
+
+	/* Central (left and right) subcontainers */
+	const l	= container_create(s);
+	l.set_direction('v');
+	l.style.alignItems = 'end';
+
+	//const r = container_create(s);
+	//r.style.alignItems = 'end';
+	//r.set_direction('v');
+
+	pane.sta_title = text_create(l);
+	pane.sta_title.set_text("BMS");
+	pane.sta_title.style.alignSelf = 'center';
+	pane.voltage	     = text_create(l);
+	pane.current	     = text_create(l);
+	pane.full_cap	     = text_create(l);
+	pane.cap	     = text_create(l);
+	pane.version	     = text_create(l);
+	//pane.temp	     = text_create(l);
+	//pane.max_input_power = text_create(l);
+
+	/*pane.veh_title = text_create(r);
+	pane.veh_title.set_text("Авто");
+	pane.veh_title.style.alignSelf = 'center';
+	pane.session_kwt   = text_create(r);
+	pane.total_kwt	   = text_create(r);
+	pane.charhing_time = text_create(r);
+	pane.time_left	   = text_create(r);*/
+
+	pane.soc = text_create(pane);
+	pane.soc.set_size(1.5);
+
+	net.add_listener(pane, id);
+
+	pane.net.recv = function(data) {
+		const [voltage, current, full_cap, cap, version, soh] = data;
+
+		let ver_str = "unknown";
+
+		if (version <= 2) {
+			ver_str = ["unknown", "ze0", "aze0/ze1"][version];
+		}
+
+		pane.voltage.set_text("Напруга:  " + voltage + "V");
+		pane.current.set_text("Струм:    " + current + "A");
+		pane.full_cap.set_text("Ємність (повна): " + full_cap + "kWh");
+		pane.cap.set_text("Залишок: " + cap + "kWh");
+		pane.version.set_text("BMS ver. " + version + " (" + ver_str + ")");
+
+		pane.soc.set_text("Заряд (SOC): " + parseInt((cap / full_cap) * 100) + "% | " +
+				  "Стан (SOH): "  + parseInt(soh));
+	};
+
+	return pane;
+};
+
+l = container_create(document.body);
+l.set_direction('v');
+
+status_widget_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_STATUS, l);
+
+paned_checkbox_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY, l,
+		      'Фільтрувати повідомлення LeafSpy (тест)');
+
+paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_IDX, l, 0, 40, 1,
+		       'Встановити індекс поля для фільтрації LBC (block 1)');
+paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_BYTE, l, 0, 255, 1,
+		       'Встановити значення поля для фільтрації LBC (block 1)');
+</script>
+</html>

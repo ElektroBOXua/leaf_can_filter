@@ -207,6 +207,8 @@ int main()
 			leaf_can_filter_process_frame(&fi, &f);
 			leaf_can_filter_update(&fi, (c_inst._frame.timestamp_us - prev_time_us) / 1000);
 
+			/*lscfi.filter_leafspy_idx  = 40u -7u;
+			  lscfi.filter_leafspy_byte = 0xAAu;*/
 			leafspy_can_filter_process_lbc_block1_frame(&lscfi, &f);
 
 			leaf_can_filter_print_variables(&fd, &f);

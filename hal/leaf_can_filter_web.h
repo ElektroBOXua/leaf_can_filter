@@ -52,7 +52,11 @@ enum leaf_can_filter_web_msg_type {
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP,
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN,
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER,
+
+	/* TEST leafspy override */
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY,
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_IDX,
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_BYTE,
 
 	LEAF_CAN_FILTER_WEB_MSG_MAX
 };
@@ -183,9 +187,20 @@ void leaf_can_filter_web_recv_msg(struct leaf_can_filter *self,
 		leaf_can_filter_fs_save(self);
 		return;
 
+	/* Experimental (testing purposes only) */
 	case LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY:
 		self->settings.filter_leafspy = value.as<bool>();
 		leaf_can_filter_fs_save(self);
+		return;
+
+	/* Experimental (testing purposes only) */
+	case LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_IDX:
+		self->filter_leafspy_idx = value.as<int>();
+		return;
+
+	/* Experimental (testing purposes only) */
+	case LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_BYTE:
+		self->filter_leafspy_byte = value.as<int>();
 		return;
 
 	default:

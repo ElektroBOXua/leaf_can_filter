@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Vehicle Web Debugger</title>
+</head>
+
+<style>
+html, body {
+	margin:  0;
+	padding: 0;
+}
+
+body {
+	margin: 1em;
+	background-image: linear-gradient(to right, #555555, #336699);
+	background-attachment: fixed; 
+}
+</style>
+
+<body>
+<div class="widget-container">
+	<span id="socketText">Очікування підключення...</span>
+	<span id="socketIndicator" class="socket-status-indicator"></span>
+</div>
+<hr>
+</body>
+
+<style>
+.socket-status-indicator {
+	display: inline-block;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	margin-left: 10px;
+	border: 1px solid #ccc;
+	transition: background-color 0.5s ease;
+}
+
+.widget-container {
+	width: 100%;
+	display: inline-flex;
+	align-items: center;
+	color: white;
+	justify-content: end;
+}
+
+.status-0 { background-color: gray; }    /* CONNECTING */
+.status-1 { background-color: green; }   /* OPEN */
+.status-2 { background-color: orange; }  /* CLOSING */
+.status-3 { background-color: red; }     /* CLOSED */
+</style>
+
+<script>
+/******************************************************************************
+ * WEBSOCKETS
+ *****************************************************************************/
+// DOM-елементи
+const indicator = document.getElementById('socketIndicator');
+const statusText = document.getElementById('socketText');
+let socket = null;
+
+/**
+ * Оновлює візуальний індикатор і текст на основі поточного стану WebSocket.
+ * @param {number} readyState - Значення readyState (0, 1, 2, 3)
+ */
+function updateStatus(readyState) {
+	// 1. Оновлення класу для зміни кольору
+	indicator.className = `socket-status-indicator status-${readyState}`;
+
+	// 2. Оновлення тексту
+	let stateName = '';
+	switch (readyState) {
+		case WebSocket.CONNECTING: // 0
+			stateName = "Підключення...";
+			break;
+		case WebSocket.OPEN: // 1
+			stateName = "Підключено";
+			break;
+		case WebSocket.CLOSING: // 2
+			stateName = "Закриття...";
+			break;
+		case WebSocket.CLOSED: // 3
+			stateName = "Відключено. Спроба відновлення...";
+			break;
+		default:
+			stateName = "Невідомий стан";
+	}
+	statusText.textContent = stateName;
+}
+
+/**
+ * Встановлює з'єднання WebSocket та налаштовує обробники.
+ */
+function connectWebSocket() {
+	socket = new WebSocket('ws://7.7.7.7/ws');
+
+	// Оновлення стану одразу після створення (стан буде CONNECTING = 0)
+	updateStatus(socket.readyState);
+
+	// ----------------------------------------------------
+	// Обробники подій
+	// ----------------------------------------------------
+	
+	// З'єднання встановлено
+	socket.onopen = function(e) {
+		updateStatus(socket.readyState); // OPEN = 1 (Зелений)
+		console.log("WebSocket: З'єднання встановлено.");
+	};
+
+	// Отримано повідомлення
+	socket.onmessage = function(event) {
+		console.log(`WebSocket: Отримано дані: ${event.data}`);
+		// Тут можна додати логіку для обробки даних
+	};
+
+	// Помилка
+	socket.onerror = function(error) {
+		console.error("WebSocket: Помилка з'єднання:", error);
+	};
+
+	// З'єднання закрито
+	socket.onclose = function(event) {
+		updateStatus(socket.readyState); // CLOSED = 3 (Червоний)
+		console.log(`WebSocket: З'єднання закрито. Код: ${event.code}`);
+
+		// Логіка автоматичного перепідключення (через 3 секунди)
+		setTimeout(() => {
+			console.log("WebSocket: Спроба відновлення з'єднання...");
+			connectWebSocket();
+		}, 3000);
+	};
+}
+
+// Запускаємо підключення, коли сторінка завантажиться
+document.addEventListener('DOMContentLoaded', connectWebSocket);
+</script>
+
+<script>
+/******************************************************************************
+ * DROPDOWN SECTION
+ *****************************************************************************/
+const style = document.createElement('style');
+style.textContent = `
+	.dropdown {
+		position: relative;
+		display: inline-block;
+		font-family: sans-serif;
+	}
+	.dropbtn {
+		background-color: #007bff;
+		color: white;
+		padding: 10px 15px;
+		font-size: 16px;
+		border: none;
+		cursor: pointer;
+		border-radius: 4px;
+	}
+	.dropdown-content {
+		display: none;
+		position: absolute;
+		background-color: #f1f1f1;
+		min-width: 160px;
+		box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+		z-index: 1;
+		border-radius: 4px;
+		margin-top: 2px;
+	}
+	.dropdown-content a {
+		color: black;
+		padding: 12px 16px;
+		text-decoration: none;
+		display: block;
+	}
+	.dropdown-content a:hover {
+		background-color: #ddd;
+	}
+	.show {
+		display: block;
+	}
+`;
+document.head.appendChild(style);
+
+/**
+ @parent    - parent element
+ @title     - text title
+ @options   - array ["opt1", "opt2", ... "optN"]
+ @callbacks - array [cb1, cb2, ... cb3] */
+function dropdown_create(parent, title, options, callbacks)
+{
+	const dropdownContainer = document.createElement('div');
+	dropdownContainer.className = 'dropdown';
+
+	const dropdownButton = document.createElement('button');
+	dropdownButton.textContent = title;
+	dropdownButton.className = 'dropbtn';
+	dropdownButton.onclick = toggleDropdown;
+
+	const dropdownContent = document.createElement('div');
+	dropdownContent.className = 'dropdown-content';
+
+	options.forEach((text, index) => {
+		const btn = document.createElement('a');
+		btn.href = '#' + text;
+		btn.textContent = text;
+		btn.onclick = (() => { callbacks[index](); })
+		dropdownContent.appendChild(btn);
+	});
+
+	function toggleDropdown() {
+		dropdownContent.classList.toggle("show");
+	}
+
+	dropdownContainer.appendChild(dropdownButton);
+	dropdownContainer.appendChild(dropdownContent);
+
+	parent.appendChild(dropdownContainer);
+}
+
+function closeAllDropdowns()
+{
+	const dropdowns = document.getElementsByClassName("dropdown-content");
+
+	for (let i = 0; i < dropdowns.length; i++) {
+		const openDropdown = dropdowns[i];
+
+		openDropdown.classList.remove('show');
+	}
+}
+
+</script>
+<script>
+/******************************************************************************
+ * STEPPER SECTION
+ *****************************************************************************/
+/**
+ * Створює віджет Stepper (лічильник зі стрілками).
+ * @param {HTMLElement} parent - Батьківський елемент, куди буде додано віджет.
+ * @param {number} initialValue - Початкове значення лічильника.
+ * @param {number} step - Крок збільшення/зменшення (за замовчуванням 1).
+ * @param {number} minLimit - Мінімальне дозволене значення (за замовчуванням 0).
+ */
+function stepper_create(parent, initialValue = 0, step = 1, minLimit = 0) {
+    
+    // Внутрішній стан
+    let currentValue = initialValue; 
+    
+    // ------------------------------------
+    // 1. Створення DOM-елементів
+    // ------------------------------------
+    const stepperContainer = document.createElement('div');
+    stepperContainer.className = 'stepper-widget';
+    
+    const decreaseButton = document.createElement('button');
+    decreaseButton.textContent = '–';
+    decreaseButton.className = 'stepper-btn decrease-btn';
+    
+    const valueDisplay = document.createElement('span');
+    valueDisplay.className = 'stepper-value';
+    
+    const increaseButton = document.createElement('button');
+    increaseButton.textContent = '+';
+    increaseButton.className = 'stepper-btn increase-btn';
+    
+    // ------------------------------------
+    // 2. Внутрішня логіка
+    // ------------------------------------
+    
+    // Функція для оновлення відображення
+    function updateDisplay() {
+        valueDisplay.textContent = currentValue;
+        
+        // Додатково: вимикаємо кнопку "-", якщо досягнуто мінімуму
+        decreaseButton.disabled = (currentValue <= minLimit);
+    }
+    
+    // Функція обробки збільшення
+    function handleIncrement() {
+        currentValue += step;
+        updateDisplay();
+    }
+    
+    // Функція обробки зменшення
+    function handleDecrement() {
+        if (currentValue > minLimit) {
+            currentValue -= step;
+            updateDisplay();
+        }
+    }
+    
+    // ------------------------------------
+    // 3. Прив'язка подій
+    // ------------------------------------
+    decreaseButton.onclick = handleDecrement;
+    increaseButton.onclick = handleIncrement;
+
+    // ------------------------------------
+    // 4. Збирання та ініціалізація
+    // ------------------------------------
+    
+    stepperContainer.appendChild(decreaseButton);
+    stepperContainer.appendChild(valueDisplay);
+    stepperContainer.appendChild(increaseButton);
+    
+    parent.appendChild(stepperContainer);
+    
+    // Початкове відображення
+    updateDisplay();
+}
+
+// ======================================================================
+// ПРИКЛАД ВИКОРИСТАННЯ:
+// ======================================================================
+
+// Додамо стилі, якщо вони ще не були додані:
+style.textContent += `
+    .stepper-widget {
+        display: flex;
+        align-items: center;
+        width: fit-content;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-family: sans-serif;
+    }
+    .stepper-btn {
+        background-color: #f1f1f1;
+        border: none;
+        padding: 8px 12px;
+        cursor: pointer;
+        font-size: 18px;
+        line-height: 1;
+        outline: none;
+        transition: background-color 0.2s;
+    }
+    .stepper-btn:hover:not(:disabled) {
+        background-color: #ddd;
+    }
+    .stepper-btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+    .stepper-value {
+        padding: 0 15px;
+        font-size: 16px;
+        font-weight: bold;
+        min-width: 30px;
+        text-align: center;
+    }
+`;
+document.head.appendChild(style);
+</script>
+
+<script>
+/******************************************************************************
+ * MAIN SECTION
+ *****************************************************************************/
+const header0 = document.createElement('h1')
+header0.textContent = "Override ISO-TP Data Fields"
+header0.style.color = "white"
+document.body.appendChild(header0)
+
+const container0 = document.createElement('div');
+container0.style.display = "flex"
+document.body.appendChild(container0)
+
+dropdown_create(container0, "Target ECU",
+	["NONE", 	"LBC 0x7BB (id:1)"],
+	[(() => {lenField0.value = 0} ),
+	 (() => {lenField0.value = 41} )]
+)
+
+
+const lenField0desc = document.createElement('div');
+lenField0desc.style.display = "flex"
+lenField0desc.style.padding = "10px 15px"
+lenField0desc.style.fontSize = "16px"
+lenField0desc.style.border = "none"
+lenField0desc.style.borderRadius = "4px"
+lenField0desc.textContent = "Length"
+lenField0desc.style.pointerEvents = "none"
+container0.appendChild(lenField0desc)
+
+const lenField0 = document.createElement('input');
+lenField0.style.display = "flex"
+lenField0.style.padding = "10px 15px"
+lenField0.style.fontSize = "16px"
+lenField0.style.border = "none"
+lenField0.style.borderRadius = "4px"
+lenField0.value = 0
+lenField0.style.pointerEvents = "none"
+container0.appendChild(lenField0)
+
+// Викликаємо функцію для створення двох різних лічильників
+stepper_create(container0, 2, 2); // Початкове значення 5, крок 1, мін 0
+
+</script>
+
+<script>
+window.onclick = function(event) {
+	if (!event.target.matches('.dropbtn') &&
+		!event.target.closest('.dropdown-content')) {
+		closeAllDropdowns();
+	}
+}
+</script>
+
+</html>

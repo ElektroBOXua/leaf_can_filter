@@ -57,6 +57,7 @@ struct leaf_can_filter_frame {
 struct leaf_can_filter_settings {
 	/* Bypass filtering completely */
 	bool filter_leafspy;
+
 	bool bypass;
 
 	/* Override bms capacity (enables energy counter) */
@@ -76,6 +77,10 @@ struct leaf_can_filter {
 	struct leafspy_can_filter lscfi;
 
 	uint8_t _version;
+
+	/* Experimental, test purposes only (replaces LBC01 byte by idx)*/
+	uint8_t filter_leafspy_idx;
+	uint8_t filter_leafspy_byte;
 };
 
 /******************************************************************************
@@ -489,6 +494,10 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 
 	/* ... */
 	self->_version = LEAF_CAN_FILTER_BMS_VERSION_UNKNOWN;
+
+	/* Experimental, test purposes only (replaces LBC01 byte by idx)*/
+	self->filter_leafspy_idx  = 0u;
+	self->filter_leafspy_byte = 0u;
 }
 
 void leaf_can_filter_process_frame(struct leaf_can_filter *self,
@@ -502,6 +511,14 @@ void leaf_can_filter_process_frame(struct leaf_can_filter *self,
 		if (self->settings.filter_leafspy) {
 			leafspy_can_filter_process_lbc_block1_frame(
 				&self->lscfi, frame);
+
+			/* Experimental, test purposes only
+			 * (replaces LBC01 byte by idx) */
+			self->lscfi.filter_leafspy_idx  =
+				self->filter_leafspy_idx;
+
+			self->lscfi.filter_leafspy_byte =
+				self->filter_leafspy_byte;
 		}
 	}
 }

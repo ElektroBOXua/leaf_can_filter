@@ -3,6 +3,7 @@
  * We don't implement the protocol, just minimal functional set
  * for our purposes
  *****************************************************************************/
+#pragma once
 
 #include <stdint.h>
 #include <string.h>
@@ -32,6 +33,10 @@ struct leafspy_can_filter {
 	uint32_t _full_sn;
 	uint8_t  _buf[0xFF];
 	uint8_t  _len_buf;
+
+	/* Experimental, test purposes only (replaces LBC01 byte by idx)*/
+	uint8_t filter_leafspy_idx;
+	uint8_t filter_leafspy_byte;
 };
 
 void leafspy_can_filter_init(struct leafspy_can_filter *self)
@@ -55,6 +60,10 @@ void leafspy_can_filter_init(struct leafspy_can_filter *self)
 
 	self->_full_sn  = 0u;
 	self->_len_buf = 0u;
+
+	/* Experimental, test purposes only (replaces LBC01 byte by idx)*/
+	self->filter_leafspy_idx  = 0u;
+	self->filter_leafspy_byte = 0u;
 }
 
 void leafspy_can_filter_process_lbc_block1_answer_pdu(
@@ -63,8 +72,22 @@ void leafspy_can_filter_process_lbc_block1_answer_pdu(
 {
 	uint8_t *d = n_pdu->n_data;
 
+	/* Don't put that anywhere near sane code...
+	 * Replaces a single byte inside lbc01 only for testing purposes */
+	if (self->filter_leafspy_idx < 2) {
+		/* We do not replace less than 2 bytes */
+	} else if ((self->_len_buf == 0u) && (self->filter_leafspy_idx < 6u)) {
+		d[self->filter_leafspy_idx] = self->filter_leafspy_byte;
+		iso_tp_override_n_pdu(&self->iso_tp, n_pdu);
+	} else if ((self->filter_leafspy_idx >= self->_len_buf) &&
+		   ((self->filter_leafspy_idx - self->_len_buf) < 7)) {
+		d[self->filter_leafspy_idx - self->_len_buf] =
+			self->filter_leafspy_byte;
+		iso_tp_override_n_pdu(&self->iso_tp, n_pdu);
+	} else {}
+
 	switch (self->_full_sn) {
-	case 0u:
+	/*case 0u:
 
 		d[2] = 0xFF;
 		d[3] = 0xFF;
@@ -83,7 +106,7 @@ void leafspy_can_filter_process_lbc_block1_answer_pdu(
 
 		iso_tp_override_n_pdu(&self->iso_tp, n_pdu);
 
-		break;
+		break;*/
 
 	case 4u:
 		self->lbc.soh = ((d[4] << 8) | d[5]) / 102.4f;
