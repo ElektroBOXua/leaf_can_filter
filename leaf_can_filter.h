@@ -262,6 +262,12 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 	self->_bms_vars.full_capacity_wh *= 80U;
 	self->_bms_vars.full_capacity_wh += 20000U;
 
+	/* Override leafspy amphours */
+	if (self->settings.capacity_override_enabled) {
+		self->lscfi.lbc.ovd.ah = chgc_get_full_cap_wh(&self->_chgc)
+					 / 355.2f; /* 3.7v * 96cells */
+	}
+
 	self->_bms_vars.remain_capacity_wh  = remain_capacity_gids;
 	self->_bms_vars.remain_capacity_wh *= 80U;
 
@@ -359,6 +365,12 @@ void _leaf_can_filter_aze0_x5BC(struct leaf_can_filter *self,
 	} else {
 		self->_bms_vars.remain_capacity_wh  = capacity_gids;
 		self->_bms_vars.remain_capacity_wh *= 80U;
+	}
+
+	/* Override leafspy amphours */
+	if (self->settings.capacity_override_enabled) {
+		self->lscfi.lbc.ovd.ah = chgc_get_full_cap_wh(&self->_chgc)
+					 / 355.2f; /* 3.7v * 96cells */
 	}
 
 	if (full_cap_bars_mux) {

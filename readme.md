@@ -42,7 +42,10 @@ MSB -> 35,     36: (uint16_t)ah /* in LeafSpy */
 * Enhance compatiblity between hardware variants
 * Store version details based on request
 * More unified interface to make CAN filter more universal
+* add overcharge
+* chademo power limit
+* recuperation multiplier
 
-**Completion: 5/12**
+**Completion: 5/15**
 
 ---

@@ -15,6 +15,10 @@ enum leafspy_query_type {
 };
 
 /** Leafspy CAN filter lbc group 1 messages */
+struct leafspy_can_lbc_override {
+	float ah;
+};
+
 struct leafspy_can_lbc {
 	float current0_A;
 	float current1_A;
@@ -25,6 +29,8 @@ struct leafspy_can_lbc {
 
 	float soc;
 	float ah;
+
+	struct leafspy_can_lbc_override ovd;
 };
 
 /** Leafspy CAN filter. Intercepts leafspy queries and
@@ -49,8 +55,13 @@ void leafspy_can_filter_init(struct leafspy_can_filter *self)
 {
 	struct iso_tp_config cfg;
 
+	self->lbc.current0_A = 0.0f;
+	self->lbc.current1_A = 0.0f;
+	self->lbc.voltage_V  = 0.0f;
+	self->lbc.hx  = 0.0f;
 	self->lbc.soc = 0.0f;
 	self->lbc.ah  = 0.0f;
+	self->lbc.ovd.ah = 0.0f;
 
 	iso_tp_init(&self->iso_tp);
 
@@ -131,6 +142,15 @@ void leafspy_can_filter_process_lbc_block1_answer_pdu(
 		break;
 	case 5u: /* 34 ... 40 */
 		self->lbc.ah = ((d[1] << 8) | d[2]) / 39.0f; /* Weird */
+
+		/* If AmpHours override enabled */
+		if (self->lbc.ovd.ah > 0.0f) {
+			uint16_t ah_raw = (self->lbc.ovd.ah * 39.0f);
+			d[1] = (ah_raw & 0xFF00u) >> 8u;
+			d[2] = (ah_raw & 0x00FFu) >> 0u;
+			iso_tp_override_n_pdu(&self->iso_tp, n_pdu);
+		}
+
 		break;
 	}
 

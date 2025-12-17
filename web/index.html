@@ -845,14 +845,14 @@ l.set_direction('v');
 
 status_widget_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_STATUS, l);
 
-//paned_checkbox_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY, l,
-//		      'Фільтрувати повідомлення LeafSpy (тест)');
-
 paned_checkbox_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN, l,
 		      'Повний обхід фільтра (bypass)');
 
 paned_checkbox_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_EN, l,
 		      'Ручне встановлення ємності');
+
+paned_checkbox_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY, l,
+		      'Фільтрувати повідомлення LeafSpy');
 
 paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_KWH, l, 4, 80, 4,
 		       'Ручне встановлення ємності (kWh)');
