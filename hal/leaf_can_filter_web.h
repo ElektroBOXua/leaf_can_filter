@@ -393,11 +393,36 @@ void leaf_can_filter_web_init(struct leaf_can_filter *self)
 void leaf_can_filter_web_update(struct leaf_can_filter *self,
 				uint32_t delta_time_ms)
 {
+	static bool reset_trigger = false;
+	static uint32_t reset_trigger_counter = 0u;
+	static uint32_t reset_trigger_timer = 0u;
+
 	static int32_t repeat_ms = 0;
 	if (repeat_ms >= 0) {
 		repeat_ms -= delta_time_ms;
 	}
-	
+
+	/* Count climate control button presses */
+	if (self->clim_ctl_btn_alert != reset_trigger) {
+		/* Count CC buttons presses */
+		reset_trigger = self->clim_ctl_btn_alert;
+		reset_trigger_counter++;
+		reset_trigger_timer = 0u;
+	}
+
+	/* If no CC buttons been pressed in past 5s */
+	if (reset_trigger_timer <= 5000u) {
+		reset_trigger_timer += delta_time_ms;
+	} else {
+		/* Reset counter */
+		reset_trigger_counter = 0u;
+	}
+
+	/* If CC buttons was pressed 5 times in past 5 seconds */
+	if (reset_trigger_counter >= 5u) {
+		ESP.restart();
+	}
+
 	if (repeat_ms <= 0) {
 		repeat_ms = 1000;
 

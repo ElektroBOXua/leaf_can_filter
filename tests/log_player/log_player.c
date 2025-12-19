@@ -65,8 +65,11 @@ void leaf_can_filter_print_hex_array_len(char *buf, uint8_t *arr, uint8_t len)
 void leaf_can_filter_print_variables(struct leaf_can_filter_frame *df,
 				     struct leaf_can_filter_frame *f)
 {
-	static uint8_t x5bc_raw_dat[8];
 	static uint8_t x5bc_raw_dat_d[8];
+	static uint8_t x5bc_raw_dat[8];
+
+	static uint8_t x11a_raw_dat_d[8];
+	static uint8_t x11a_raw_dat[8];
 
 	char buf[1024*4];
 	buf[0] = '\0';
@@ -74,6 +77,11 @@ void leaf_can_filter_print_variables(struct leaf_can_filter_frame *df,
 	if (f->id == 0x5BC) {
 		memcpy(x5bc_raw_dat_d, df->data, 8u);
 		memcpy(x5bc_raw_dat, f->data, 8u);
+	}
+
+	if (f->id == 0x11A) {
+		memcpy(x11a_raw_dat_d, df->data, 8u);
+		memcpy(x11a_raw_dat, f->data, 8u);
 	}
 
 	sprintf(buf, "\033[H");
@@ -87,6 +95,9 @@ void leaf_can_filter_print_variables(struct leaf_can_filter_frame *df,
 
 	sprintf(buf + strlen(buf), "current_A: %f                          \n",
 		fi._bms_vars.current_A);
+
+	sprintf(buf + strlen(buf), "vehicleON: %s                          \n",
+		fi.vehicle_is_on ? "true" : "false");
 
 	sprintf(buf + strlen(buf), "\033[K\n");
 
@@ -115,6 +126,13 @@ void leaf_can_filter_print_variables(struct leaf_can_filter_frame *df,
 	leaf_can_filter_print_hex_array(buf, x5bc_raw_dat_d);
 	sprintf(buf + strlen(buf), "5bc_raw_dat_4:     ");
 	leaf_can_filter_print_hex_array(buf, x5bc_raw_dat);
+
+	sprintf(buf + strlen(buf), "\033[K\n");
+
+	sprintf(buf + strlen(buf), "11a_raw_dat_4_d:   ");
+	leaf_can_filter_print_hex_array(buf, x11a_raw_dat_d);
+	sprintf(buf + strlen(buf), "11a_raw_dat_4:     ");
+	leaf_can_filter_print_hex_array(buf, x11a_raw_dat);
 
 	sprintf(buf + strlen(buf), "\033[K\n");
 

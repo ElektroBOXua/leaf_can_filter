@@ -55,9 +55,10 @@ struct leaf_can_filter_frame {
 #include "leafspy_can_filter.h"
 
 struct leaf_can_filter_settings {
-	/* Bypass filtering completely */
+	/* Enable LeafSpy filtering */
 	bool filter_leafspy;
 
+	/* Bypass filtering completely */
 	bool bypass;
 
 	/* Override bms capacity (enables energy counter) */
@@ -81,6 +82,14 @@ struct leaf_can_filter {
 	/* Experimental, test purposes only (replaces LBC01 byte by idx)*/
 	uint8_t filter_leafspy_idx;
 	uint8_t filter_leafspy_byte;
+
+	/* Vehicle ON/OFF status */
+	bool vehicle_is_on;
+
+	/* Climate control */
+	bool clim_ctl_recirc;
+	bool clim_ctl_fresh_air;
+	bool clim_ctl_btn_alert;
 };
 
 /******************************************************************************
@@ -454,17 +463,33 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		self->settings.capacity_remaining_kwh =
 			chgc_get_remain_cap_kwh(&self->_chgc);
 
-#ifdef    LEAF_CAN_FILTER_DEBUG
-		if (!self->_b.debug) {
-			break;
-		}
-
-		LEAF_CAN_FILTER_LOG_U16(voltage_V);
-		LEAF_CAN_FILTER_LOG_I16(current_A);
-#endif /* LEAF_CAN_FILTER_DEBUG */
-
 		break;
 	}
+
+	case 0x11A:
+		if ((frame->data[1] & 0x40u) > 0) {
+			self->vehicle_is_on = true;
+		} else if (frame->data[1] & 0x80u) {
+			self->vehicle_is_on = false;
+		} else {
+			self->vehicle_is_on = false;
+		}
+
+		break;
+
+	case 0x54B:
+		if (frame->data[3] == 9u) {
+			self->clim_ctl_recirc    = true;
+			self->clim_ctl_fresh_air = false;
+		} else if (frame->data[3] == 9u << 1) {
+			self->clim_ctl_recirc    = false;
+			self->clim_ctl_fresh_air = true;
+		}
+
+		self->clim_ctl_btn_alert = ((frame->data[7] & 0x01u) > 0u) ?
+						1u : 0u;
+
+		break;
 	
 	default:
 		break;
@@ -510,6 +535,14 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 	/* Experimental, test purposes only (replaces LBC01 byte by idx)*/
 	self->filter_leafspy_idx  = 0u;
 	self->filter_leafspy_byte = 0u;
+
+	/* Vehicle ON/OFF status */
+	self->vehicle_is_on = false;
+
+	/* Climate control */
+	self->clim_ctl_recirc    = false;
+	self->clim_ctl_fresh_air = false;
+	self->clim_ctl_btn_alert = false;
 }
 
 void leaf_can_filter_process_frame(struct leaf_can_filter *self,
