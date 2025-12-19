@@ -405,39 +405,18 @@ void leaf_can_filter_web_stop()
 void leaf_can_filter_web_update(struct leaf_can_filter *self,
 				uint32_t delta_time_ms)
 {
-	/* Stuff to reset cpu via leaf interface
-	 * Will also reset wifi */
-	static bool reset_trigger = false;
-	static uint32_t reset_trigger_counter = 0u;
-	static uint32_t reset_trigger_timer = 0u;
-
 	/* Automatically off wifi after 5 min inactivity */
 	static bool wifi_stop_is_stopped = false;
 	static uint32_t wifi_stop_timer = 0u;
 
+	/* WS message repeat time */
 	static int32_t repeat_ms = 0;
 	if (repeat_ms >= 0) {
 		repeat_ms -= delta_time_ms;
 	}
 
-	/* Count climate control button presses */
-	if (self->clim_ctl_btn_alert != reset_trigger) {
-		/* Count CC buttons presses */
-		reset_trigger = self->clim_ctl_btn_alert;
-		reset_trigger_counter++;
-		reset_trigger_timer = 0u;
-	}
-
-	/* If no CC buttons been pressed in past 5s */
-	if (reset_trigger_timer <= 5000u) {
-		reset_trigger_timer += delta_time_ms;
-	} else {
-		/* Reset counter */
-		reset_trigger_counter = 0u;
-	}
-
 	/* If CC buttons was pressed 5 times in past 5 seconds */
-	if (reset_trigger_counter >= 5u) {
+	if (reset_trigger_counter >= 10u) {
 		ESP.restart();
 	}
 

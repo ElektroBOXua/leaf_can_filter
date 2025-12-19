@@ -45,6 +45,38 @@ void leaf_can_filter_web_task(void *pv_parameters)
 	}
 }
 
+/* Look for software reset sequence (climate control button pressed multiple
+ * 				     times in a certain period of time) */
+void leaf_can_filter_check_softreset_sequence()
+{
+	/* Stuff to reset cpu via leaf interface
+	 * Will also reset wifi */
+	static bool reset_trigger = false;
+	static uint32_t reset_trigger_counter = 0u;
+	static uint32_t reset_trigger_timer = 0u;
+
+	/* Count climate control button presses */
+	if (self->clim_ctl_btn_alert != reset_trigger) {
+		/* Count CC buttons presses */
+		reset_trigger = self->clim_ctl_btn_alert;
+		reset_trigger_counter++;
+		reset_trigger_timer = 0u;
+	}
+
+	/* If no CC buttons been pressed in past 5s */
+	if (reset_trigger_timer <= 5000u) {
+		reset_trigger_timer += delta_time_ms;
+	} else {
+		/* Reset counter */
+		reset_trigger_counter = 0u;
+	}
+
+	/* If CC buttons was pressed 10 times in past 5 seconds */
+	if (reset_trigger_counter >= 10u) {
+		ESP.restart();
+	}
+}
+
 void setup()
 {
 	delta_time_init(&dt);
@@ -91,6 +123,8 @@ void loop()
 		}
 
 		leaf_can_filter_fs_update(&filter, delta_time_ms);
+
+		leaf_can_filter_check_softreset_sequence();
 
 		// --- CRITICAL SECTION END ---
 
