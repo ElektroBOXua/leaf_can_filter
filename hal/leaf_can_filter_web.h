@@ -371,6 +371,9 @@ void leaf_can_filter_web_init(struct leaf_can_filter *self)
 			  IPAddress(255, 255, 255, 0));
 	WiFi.softAP("LeafBOX");
 
+	/* Cleanup previous data */
+	web_server.reset();
+
 	/* Server config */
 	web_server.onNotFound(web_server_send_index);
 
@@ -390,12 +393,27 @@ void leaf_can_filter_web_init(struct leaf_can_filter *self)
 	dns_server.start(53, "*", WiFi.softAPIP());
 }
 
+void leaf_can_filter_web_stop()
+{
+	dns_server.stop();
+	web_socket.closeAll(); 
+	web_server.end(); 
+	WiFi.softAPdisconnect(true); 
+    	WiFi.mode(WIFI_OFF);
+}
+
 void leaf_can_filter_web_update(struct leaf_can_filter *self,
 				uint32_t delta_time_ms)
 {
+	/* Stuff to reset cpu via leaf interface
+	 * Will also reset wifi */
 	static bool reset_trigger = false;
 	static uint32_t reset_trigger_counter = 0u;
 	static uint32_t reset_trigger_timer = 0u;
+
+	/* Automatically off wifi after 5 min inactivity */
+	static bool wifi_stop_is_stopped = false;
+	static uint32_t wifi_stop_timer = 0u;
 
 	static int32_t repeat_ms = 0;
 	if (repeat_ms >= 0) {
@@ -425,6 +443,21 @@ void leaf_can_filter_web_update(struct leaf_can_filter *self,
 
 	if (repeat_ms <= 0) {
 		repeat_ms = 1000;
+
+		if (WiFi.softAPgetStationNum() <= 0) {
+			wifi_stop_timer++;
+		} else {
+			wifi_stop_timer = 0u;
+		}
+
+		if (!wifi_stop_is_stopped && wifi_stop_timer >= (60u * 5u)) {
+			leaf_can_filter_web_stop(); 
+
+			/* Terminate current task */
+			vTaskDelete(NULL);
+
+			wifi_stop_is_stopped = true;
+		}
 
 		if (xSemaphoreTake(_filter_mutex, portMAX_DELAY) == pdTRUE) {
 			leaf_can_filter_web_send_update(self);

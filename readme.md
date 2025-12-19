@@ -46,8 +46,8 @@ MSB -> 35,     36: (uint16_t)ah /* in LeafSpy */
 * chademo power limit
 * recuperation multiplier
 * request SOH reset
-* auto disable WiFi
-* enable WiFi by key sequence
+* ~~auto disable WiFi~~
+* ~~enable WiFi by key sequence~~
 * English version of UI
 
 **Completion: 5/19**
