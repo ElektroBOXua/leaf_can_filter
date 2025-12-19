@@ -415,11 +415,6 @@ void leaf_can_filter_web_update(struct leaf_can_filter *self,
 		repeat_ms -= delta_time_ms;
 	}
 
-	/* If CC buttons was pressed 5 times in past 5 seconds */
-	if (reset_trigger_counter >= 10u) {
-		ESP.restart();
-	}
-
 	if (repeat_ms <= 0) {
 		repeat_ms = 1000;
 

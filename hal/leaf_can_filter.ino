@@ -47,7 +47,8 @@ void leaf_can_filter_web_task(void *pv_parameters)
 
 /* Look for software reset sequence (climate control button pressed multiple
  * 				     times in a certain period of time) */
-void leaf_can_filter_check_softreset_sequence()
+void leaf_can_filter_check_softreset_sequence(struct leaf_can_filter *self,
+					      uint32_t delta_time_ms)
 {
 	/* Stuff to reset cpu via leaf interface
 	 * Will also reset wifi */
@@ -64,7 +65,7 @@ void leaf_can_filter_check_softreset_sequence()
 	}
 
 	/* If no CC buttons been pressed in past 5s */
-	if (reset_trigger_timer <= 5000u) {
+	if (reset_trigger_timer < 5000u) {
 		reset_trigger_timer += delta_time_ms;
 	} else {
 		/* Reset counter */
@@ -124,7 +125,8 @@ void loop()
 
 		leaf_can_filter_fs_update(&filter, delta_time_ms);
 
-		leaf_can_filter_check_softreset_sequence();
+		leaf_can_filter_check_softreset_sequence(&filter,
+							 delta_time_ms);
 
 		// --- CRITICAL SECTION END ---
 
