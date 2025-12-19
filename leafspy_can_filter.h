@@ -154,6 +154,7 @@ void leafspy_can_filter_process_lbc_block1_answer_pdu(
 		break;
 	}
 
+	/* TODO make dlc exact ff_dl */
 	if ((self->_len_buf + n_pdu->len_n_data) < 0xFFu) {
 		memcpy(&self->_buf[self->_len_buf],
 			n_pdu->n_data, n_pdu->len_n_data);
@@ -206,7 +207,11 @@ void leafspy_can_filter_process_lbc_block1_frame(
 	case 1u: /* Initial state, observe first frame */
 		if (has_n_pdu && (f.id == lbc_id) &&
 		    (n_pdu.n_pci.n_pcitype == ISO_TP_N_PCITYPE_FF) &&
-		    (n_pdu.len_n_data == 6u)) {
+		    (n_pdu.len_n_data == 6u) &&
+		    /* Only certain ff_dl are allowed
+		     * (vehicle version specific) */
+		     ((n_pdu.n_pci.ff_dl == 41u) ||
+		      (n_pdu.n_pci.ff_dl == 43u))) {
 			self->_len_buf = 0u;
 			leafspy_can_filter_process_lbc_block1_answer_pdu(self,
 								       &n_pdu);

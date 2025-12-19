@@ -123,7 +123,7 @@ uint8_t _leaf_can_filter_aze0_x5BC_get_cap_bars_overriden(
 		}
 
 		overriden = (uint8_t)bars;
-	} else if (self->_bms_vars.remain_capacity_wh > 0u) {
+	} else if (self->_bms_vars.full_capacity_wh > 0u) {
 		uint16_t bars = ((self->_bms_vars.remain_capacity_wh *
 				  240u) /
 				 self->_bms_vars.full_capacity_wh);
