@@ -6,7 +6,113 @@
 #include "dev_timeout_led_indicator.h"
 
 /******************************************************************************
- * CLASS
+ * Common
+ *****************************************************************************/
+/* Leaf can frame data structure */
+struct leaf_can_filter_frame {
+	uint32_t id;
+	uint8_t  len;
+	uint8_t  data[8];
+};
+
+/******************************************************************************
+ * Version sniffer to decide which vehicle version is used
+ *****************************************************************************/
+enum leaf_can_filter_bms_version {
+	LEAF_CAN_FILTER_BMS_VERSION_UNKNOWN, /* No votes or overlap */
+	LEAF_CAN_FILTER_BMS_VERSION_ZE0,
+	LEAF_CAN_FILTER_BMS_VERSION_AZE0,
+	LEAF_CAN_FILTER_BMS_VERSION_NV200
+};
+
+struct leaf_version_sniffer {
+	/* Votes(flags) for each version. Should not overlap */
+	uint8_t ze0;
+	uint8_t aze0;
+	uint8_t nv200;
+
+	/* Preditcted vehicle version */
+	uint8_t _version;
+
+	/* Preditcted vehicle version */
+	uint8_t _timer_ms;
+};
+
+void leaf_version_sniffer_init(struct leaf_version_sniffer *self)
+{
+	self->_ze0   = 0u;
+	self->_aze0  = 0u;
+	self->_nv200 = 0u;
+
+	self->_version = LEAF_CAN_FILTER_BMS_VERSION_UNKNOWN;
+
+	self->_timer_ms = 0u;
+}
+
+uint8_t leaf_version_sniffer_get_version(struct leaf_version_sniffer *self)
+{
+	return _version;
+}
+
+uint8_t leaf_version_sniffer_push_frame(struct leaf_version_sniffer *self,
+					struct leaf_can_filter_frame *f)
+{
+	switch (f->id) {
+	case 0x50AU: /* BO_ 1290 x50A: 6 VCM */
+		if (frame->len == 6u) {
+			self->_ze0 |= 1u;
+		} else if (frame->len == 8u) {
+			self->_aze0 |= 1u;
+		} else {}
+
+		break;
+
+	default:
+		break;
+	}
+}
+
+void _leaf_version_sniffer_predict_version(struct leaf_version_sniffer *self)
+{
+	uint8_t new_version = 0u;
+	uint8_t total_votes = 0u;
+
+	if (self->_ze0 > 0u) {
+		new_version = LEAF_CAN_FILTER_BMS_VERSION_ZE0;
+		total_votes++;
+	}
+
+	if (self->_aze0 > 0u) {
+		new_version = LEAF_CAN_FILTER_BMS_VERSION_AZE0;
+		total_votes++;
+	}
+
+	if (self->_nv200 > 0u) {
+		new_version = LEAF_CAN_FILTER_BMS_VERSION_NV200;
+		total_votes++;
+	}
+
+	/* Can't have multiple versions at once, or no version at all */
+	if (total != 1u) {
+		self->_version = LEAF_CAN_FILTER_BMS_VERSION_UNKNOWN
+	} else {
+		self->_version = new_version;
+	}
+}
+
+void leaf_version_sniffer_step(struct leaf_version_sniffer *self,
+			       uint32_t delta_time_ms)
+{
+	if (self->_timer_ms < 100u) {
+		self->_timer_ms	+= (uint8_t)delta_time_ms;
+	} else {
+		self->_timer_ms -= 100u;
+		_leaf_version_sniffer_predict_version(self);
+	}
+}
+
+/******************************************************************************
+ * BMS variables common for all leaf vehicles
  *****************************************************************************/
 struct leaf_bms_vars {
 	float voltage_V;
@@ -36,21 +142,8 @@ void leaf_bms_vars_init(struct leaf_bms_vars *self)
 }
 
 /******************************************************************************
- * CLASS
+ * Main data structures
  *****************************************************************************/
-enum leaf_can_filter_bms_version {
-	LEAF_CAN_FILTER_BMS_VERSION_UNKNOWN,
-	LEAF_CAN_FILTER_BMS_VERSION_ZE0,
-	LEAF_CAN_FILTER_BMS_VERSION_AZE0
-};
-
-/* Leaf can frame data structure */
-struct leaf_can_filter_frame {
-	uint32_t id;
-	uint8_t  len;
-	uint8_t  data[8];
-};
-
 /* leafSpy can filter depend on struct leaf_can_filter_frame */
 #include "leafspy_can_filter.h"
 
@@ -77,7 +170,7 @@ struct leaf_can_filter {
 	struct leaf_bms_vars _bms_vars;
 	struct leafspy_can_filter lscfi;
 
-	uint8_t _version;
+	struct leaf_version_sniffer lvs;
 
 	/* Experimental, test purposes only (replaces LBC01 byte by idx)*/
 	uint8_t filter_leafspy_idx;
@@ -93,7 +186,7 @@ struct leaf_can_filter {
 };
 
 /******************************************************************************
- * PRIVATE
+ * Private
  *****************************************************************************/
 /* TODO enforce this conversion everywhere */
 uint16_t _leaf_can_filter_wh_to_gids(uint32_t wh)
@@ -395,13 +488,11 @@ void _leaf_can_filter_aze0_x5BC(struct leaf_can_filter *self,
 void _leaf_can_filter(struct leaf_can_filter *self,
 		      struct leaf_can_filter_frame *frame)
 {
+	/* leaf_version_sniffer_push_frame(&self->lvs, frame); */
+
 	switch (frame->id) {
 	case 0x50AU: /* BO_ 1290 x50A: 6 VCM */
-		if (frame->len == 6u) {
-			self->_version = LEAF_CAN_FILTER_BMS_VERSION_ZE0;
-		} else if (frame->len == 8u) {
-			self->_version = LEAF_CAN_FILTER_BMS_VERSION_AZE0;
-		} else {}
+		leaf_version_sniffer_push_frame(&self->lvs, frame);
 
 		break;
 
@@ -412,12 +503,12 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 			break;
 		}
 
-		if (self->_version ==
-		    (uint8_t)LEAF_CAN_FILTER_BMS_VERSION_ZE0) {
+		if (leaf_version_sniffer_get_version(&self->lvs) ==
+		    LEAF_CAN_FILTER_BMS_VERSION_ZE0) {
 			_leaf_can_filter_ze0_x5BC(self, frame);
 		}
 
-		if (self->_version ==
+		if (leaf_version_sniffer_get_version(&self->lvs) ==
 		    (uint8_t)LEAF_CAN_FILTER_BMS_VERSION_AZE0) {
 			_leaf_can_filter_aze0_x5BC(self, frame);
 		}
@@ -530,7 +621,7 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 	leafspy_can_filter_init(&self->lscfi);
 
 	/* ... */
-	self->_version = LEAF_CAN_FILTER_BMS_VERSION_UNKNOWN;
+	leaf_version_sniffer_init(&lvs);
 
 	/* Experimental, test purposes only (replaces LBC01 byte by idx)*/
 	self->filter_leafspy_idx  = 0u;
@@ -574,6 +665,7 @@ void leaf_can_filter_update(struct leaf_can_filter *self,
 	/* Certain tasks should not be updated during bypass */
 	if (self->settings.bypass == false) {
 		_leaf_can_filter_update(self, delta_time_ms);
+		leaf_version_sniffer_step(&self->lvs, delta_time_ms);
 	}
 }
 
