@@ -86,7 +86,7 @@ void leaf_can_filter_print_variables(struct leaf_can_filter_frame *df,
 
 	sprintf(buf, "\033[H");
 	sprintf(buf + strlen(buf), "_version:  %u                          \n",
-		fi._version);
+		leaf_version_sniffer_get_version(&fi.lvs));
 
 	sprintf(buf + strlen(buf), "\033[K\n");
 
@@ -199,7 +199,7 @@ int main()
 	chgc_set_initial_cap_kwh(&fi._chgc, 5.120f);
 	fi.settings.capacity_override_enabled = true;
 	fi.settings.soh_mul = 1.0f;
-	file = fopen(files[0], "r");
+	file = fopen(files[1], "r");
 	assert(file);
 	
 	c = getc(file);

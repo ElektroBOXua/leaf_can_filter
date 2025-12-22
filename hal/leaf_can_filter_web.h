@@ -95,7 +95,9 @@ void leaf_can_filter_web_send_initial_msg(struct leaf_can_filter *self)
 		narr2.add(self->_bms_vars.full_capacity_wh / 1000.0f);
 		narr2.add(self->_bms_vars.remain_capacity_wh / 1000.0f);
 	}
-	narr2.add(self->_version); /* Add bms version into messages */
+
+	/* Add bms version into messages */
+	narr2.add(leaf_version_sniffer_get_version(&self->lvs));
 	narr2.add(self->_bms_vars.soh);
 
 	narr = array.add<JsonArray>();
