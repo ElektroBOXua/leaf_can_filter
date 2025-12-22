@@ -29,7 +29,7 @@ enum leaf_can_filter_bms_version {
 };
 
 struct leaf_version_sniffer {
-	/* Votes(flags) for each version. Should not overlap */
+	/* Votes for each version. */
 	uint8_t _ze0;
 	uint8_t _aze0;
 	uint8_t _nv200;
@@ -37,8 +37,12 @@ struct leaf_version_sniffer {
 	/* Preditcted vehicle version */
 	uint8_t _version;
 
-	/* Preditcted vehicle version */
+	/* Timer to set version check interval */
 	uint8_t _timer_ms;
+
+	/* Guards (checks only once) */
+	bool once_h50a;
+	bool once_h60d;
 };
 
 void leaf_version_sniffer_init(struct leaf_version_sniffer *self)
@@ -50,6 +54,9 @@ void leaf_version_sniffer_init(struct leaf_version_sniffer *self)
 	self->_version = LEAF_CAN_FILTER_BMS_VERSION_UNKNOWN;
 
 	self->_timer_ms = 0u;
+
+	self->once_h50a = false;
+	self->once_h60d = false;
 }
 
 uint8_t leaf_version_sniffer_get_version(struct leaf_version_sniffer *self)
@@ -62,11 +69,31 @@ void leaf_version_sniffer_push_frame(struct leaf_version_sniffer *self,
 {
 	switch (f->id) {
 	case 0x50AU: /* BO_ 1290 x50A: 6 VCM */
+		if (self->once_h50a) {
+			break;
+		} else {
+			self->once_h50a = true;
+		}
+
 		if (f->len == 6u) {
 			self->_ze0 |= 1u;
 		} else if (f->len == 8u) {
 			self->_aze0 |= 1u;
 		} else {}
+
+		break;
+
+	/*case 0x5B9U:
+		self->_nv200 |= 1u;*/
+
+	case 0x60DU:
+		if (self->once_h60d) {
+			break;
+		} else {
+			self->once_h60d = true;
+		}
+
+		self->_nv200 |= 1u;
 
 		break;
 
@@ -77,30 +104,24 @@ void leaf_version_sniffer_push_frame(struct leaf_version_sniffer *self,
 
 void _leaf_version_sniffer_predict_version(struct leaf_version_sniffer *self)
 {
-	uint8_t new_version = 0u;
-	uint8_t total_votes = 0u;
+	uint8_t new_version = LEAF_CAN_FILTER_BMS_VERSION_UNKNOWN;
 
-	if (self->_ze0 > 0u) {
+	if ((self->_ze0 == 1u) && (self->_aze0 == 0u) &&
+	    (self->_nv200 == 0u)) {
 		new_version = LEAF_CAN_FILTER_BMS_VERSION_ZE0;
-		total_votes++;
 	}
 
-	if (self->_aze0 > 0u) {
+	if ((self->_ze0 == 0u) && (self->_aze0 == 1u) &&
+	    (self->_nv200 == 0u)) {
 		new_version = LEAF_CAN_FILTER_BMS_VERSION_AZE0;
-		total_votes++;
 	}
 
-	if (self->_nv200 > 0u) {
+	if ((self->_ze0 == 0u) && (self->_aze0 == 1u) &&
+	    (self->_nv200 == 1u)) {
 		new_version = LEAF_CAN_FILTER_BMS_VERSION_NV200;
-		total_votes++;
 	}
 
-	/* Can't have multiple versions at once, or no version at all */
-	if (total_votes != 1u) {
-		self->_version = LEAF_CAN_FILTER_BMS_VERSION_UNKNOWN;
-	} else {
-		self->_version = new_version;
-	}
+	self->_version = new_version;
 }
 
 void leaf_version_sniffer_step(struct leaf_version_sniffer *self,
@@ -488,14 +509,9 @@ void _leaf_can_filter_aze0_x5BC(struct leaf_can_filter *self,
 void _leaf_can_filter(struct leaf_can_filter *self,
 		      struct leaf_can_filter_frame *frame)
 {
-	/* leaf_version_sniffer_push_frame(&self->lvs, frame); */
+	leaf_version_sniffer_push_frame(&self->lvs, frame);
 
 	switch (frame->id) {
-	case 0x50AU: /* BO_ 1290 x50A: 6 VCM */
-		leaf_version_sniffer_push_frame(&self->lvs, frame);
-
-		break;
-
 	/* BO_ 1468 x5BC: 8 HVBAT */
 	case 1468U: {
 		/* If LBC not booted up - exit */
@@ -510,6 +526,12 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 
 		if (leaf_version_sniffer_get_version(&self->lvs) ==
 		    (uint8_t)LEAF_CAN_FILTER_BMS_VERSION_AZE0) {
+			_leaf_can_filter_aze0_x5BC(self, frame);
+		}
+
+		/* Temporarily same as AZE0 */
+		if (leaf_version_sniffer_get_version(&self->lvs) ==
+		    (uint8_t)LEAF_CAN_FILTER_BMS_VERSION_NV200) {
 			_leaf_can_filter_aze0_x5BC(self, frame);
 		}
 
@@ -644,7 +666,11 @@ void leaf_can_filter_process_frame(struct leaf_can_filter *self,
 		_leaf_can_filter(self, frame);
 
 		/* Filter LeafSpy messages */
-		if (self->settings.filter_leafspy) {
+		if (self->settings.filter_leafspy &&
+			/* We not filter leafspy messages for NV200, yet */
+		    (leaf_version_sniffer_get_version(&self->lvs) !=
+			(uint8_t)LEAF_CAN_FILTER_BMS_VERSION_NV200)
+		    ) {
 			leafspy_can_filter_process_lbc_block1_frame(
 				&self->lscfi, frame);
 

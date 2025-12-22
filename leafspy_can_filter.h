@@ -96,7 +96,7 @@ void leafspy_can_filter_process_lbc_block1_answer_pdu(
 		d[self->filter_leafspy_idx] = self->filter_leafspy_byte;
 		(void)iso_tp_override_n_pdu(&self->iso_tp, n_pdu);
 	} else if ((self->filter_leafspy_idx >= self->_len_buf) &&
-		   ((self->filter_leafspy_idx - self->_len_buf) < 7u)) {
+		   ((self->filter_leafspy_idx - self->_len_buf) < 7)) {
 		d[self->filter_leafspy_idx - self->_len_buf] =
 			self->filter_leafspy_byte;
 		(void)iso_tp_override_n_pdu(&self->iso_tp, n_pdu);
@@ -213,7 +213,7 @@ void leafspy_can_filter_process_lbc_block1_frame(
 		    (n_pdu.n_pci.n_pcitype == (uint8_t)ISO_TP_N_PCITYPE_FF) &&
 		    (n_pdu.len_n_data == 6u) &&
 		    /* Only certain ff_dl are allowed
-		     * (vehicle version specific) */
+		     * (vehicle version specific) TODO */
 		     ((n_pdu.n_pci.ff_dl == 41u) ||
 		      (n_pdu.n_pci.ff_dl == 43u))) {
 			self->_len_buf = 0u;
