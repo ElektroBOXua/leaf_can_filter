@@ -182,6 +182,9 @@ struct leaf_can_filter_settings {
 	float capacity_full_voltage_V;
 
 	float soh_mul;
+
+	/* bms version override */
+	uint8_t bms_version_override;
 };
 
 struct leaf_can_filter {
@@ -514,24 +517,29 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 	switch (frame->id) {
 	/* BO_ 1468 x5BC: 8 HVBAT */
 	case 1468U: {
+		uint8_t version;
+
 		/* If LBC not booted up - exit */
 		if (frame->data[0U] == 0xFFU) {
 			break;
 		}
 
-		if (leaf_version_sniffer_get_version(&self->lvs) ==
-		    (uint8_t)LEAF_CAN_FILTER_BMS_VERSION_ZE0) {
+		if (self->settings.bms_version_override > 0u) {
+			version = self->settings.bms_version_override;
+		} else {
+			version = leaf_version_sniffer_get_version(&self->lvs);
+		}
+
+		if (version == (uint8_t)LEAF_CAN_FILTER_BMS_VERSION_ZE0) {
 			_leaf_can_filter_ze0_x5BC(self, frame);
 		}
 
-		if (leaf_version_sniffer_get_version(&self->lvs) ==
-		    (uint8_t)LEAF_CAN_FILTER_BMS_VERSION_AZE0) {
+		if (version == (uint8_t)LEAF_CAN_FILTER_BMS_VERSION_AZE0) {
 			_leaf_can_filter_aze0_x5BC(self, frame);
 		}
 
 		/* Temporarily same as AZE0 */
-		if (leaf_version_sniffer_get_version(&self->lvs) ==
-		    (uint8_t)LEAF_CAN_FILTER_BMS_VERSION_NV200) {
+		if (version == (uint8_t)LEAF_CAN_FILTER_BMS_VERSION_NV200) {
 			_leaf_can_filter_aze0_x5BC(self, frame);
 		}
 
@@ -632,6 +640,7 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 	s->capacity_full_voltage_V   = 0.0f;
 
 	s->soh_mul = 1.0f;
+	s->bms_version_override = 0u;
 
 	/* Other (some settings may depend on FS) */
 	chgc_init(&self->_chgc);

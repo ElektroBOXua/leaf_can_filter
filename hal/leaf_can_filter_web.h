@@ -58,6 +58,8 @@ enum leaf_can_filter_web_msg_type {
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_IDX,
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_BYTE,
 
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_BMS_VER,
+
 	LEAF_CAN_FILTER_WEB_MSG_MAX
 };
 
@@ -97,7 +99,12 @@ void leaf_can_filter_web_send_initial_msg(struct leaf_can_filter *self)
 	}
 
 	/* Add bms version into messages */
-	narr2.add(leaf_version_sniffer_get_version(&self->lvs));
+	if (self->settings.bms_version_override > 0u) {
+		narr2.add(self->settings.bms_version_override);
+	} else {
+		narr2.add(leaf_version_sniffer_get_version(&self->lvs));
+	}
+
 	narr2.add(self->_bms_vars.soh);
 
 	narr = array.add<JsonArray>();
@@ -203,6 +210,11 @@ void leaf_can_filter_web_recv_msg(struct leaf_can_filter *self,
 	/* Experimental (testing purposes only) */
 	case LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_BYTE:
 		self->filter_leafspy_byte = value.as<int>();
+		return;
+
+	case LEAF_CAN_FILTER_WEB_MSG_TYPE_BMS_VER:
+		self->settings.bms_version_override = value.as<int>();
+		leaf_can_filter_fs_save(self);
 		return;
 
 	default:

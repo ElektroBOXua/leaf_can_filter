@@ -756,6 +756,7 @@ const LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP               = 5;
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN               = 6;
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER          = 7;
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY          = 8;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_BMS_VER                 = 9;
 
 function status_widget_create(id, parent)
 {
@@ -862,6 +863,9 @@ paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_FULL_VOLTAGE_V, l, 
 
 paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER, l, 0.0, 3.0, 0.1,
 		       'Встановлення множника SOH (0.0 - 3.0)');
+
+paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_BMS_VER, l, 0.0, 3.0, 1.0,
+		       'Версія BMS (0 = автоматично)');
 
 action_applier_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP, l, 'Вимкнення Wi-Fi', '&#128225',
 		      'Бажаєте вимкнути WiFi?');
