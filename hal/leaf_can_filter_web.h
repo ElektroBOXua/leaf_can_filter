@@ -131,6 +131,10 @@ void leaf_can_filter_web_send_initial_msg(struct leaf_can_filter *self)
 	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY);
 	narr.add(self->settings.filter_leafspy);
 
+	narr = array.add<JsonArray>();
+	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_BMS_VER);
+	narr.add(self->settings.bms_version_override);
+
 	serializeJson(array, serialized);
 	web_socket.textAll(serialized.c_str());
 }

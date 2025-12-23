@@ -198,6 +198,7 @@ int main()
 	chgc_set_full_cap_kwh(&fi._chgc, 40.0f);
 	chgc_set_initial_cap_kwh(&fi._chgc, 5.120f);
 	fi.settings.capacity_override_enabled = true;
+	fi.settings.bms_version_override = 0u;
 	fi.settings.soh_mul = 1.0f;
 	file = fopen(files[11], "r");
 	assert(file);

@@ -548,6 +548,9 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 
 	/* BO_ 475 x1DB: 8 HVBAT */
 	case 475U: {
+		/* Important WARNING:
+		 * Logs from nv200 (2019 year) does not have this message.
+		 * (40kwt batt). TODO find correct messages. TODO version */
 		uint16_t voltage_500mV = 0U;
 		int16_t  current_500mA = 0;
 
