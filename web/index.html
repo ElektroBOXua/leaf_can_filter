@@ -808,10 +808,10 @@ function status_widget_create(id, parent)
 	pane.net.recv = function(data) {
 		const [voltage, current, full_cap, cap, version, soh] = data;
 
-		let ver_str = "unknown";
+		let ver_str = "invalid";
 
-		if (version <= 2) {
-			ver_str = ["unknown", "ze0", "aze0/ze1"][version];
+		if (version <= 3) {
+			ver_str = ["unknown", "ze0", "aze0", "nv200"][version];
 		}
 
 		pane.voltage.set_text("Напруга:  " + voltage + "V");
