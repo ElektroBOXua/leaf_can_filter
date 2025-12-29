@@ -109,20 +109,32 @@ void loop()
 	// Block indefinitely until the mutex is available
 	if (xSemaphoreTake(_filter_mutex, portMAX_DELAY) == pdTRUE) {
 		// --- CRITICAL SECTION START ---
-
 		leaf_can_filter_hal_update(delta_time_ms);
 		leaf_can_filter_update(&filter, delta_time_ms);
 
 		if (leaf_can_filter_hal_recv_frame(0, &frame)) {
 			leaf_can_filter_process_frame(&filter, &frame);
 			leaf_can_filter_hal_send_frame(1, &frame);
+
+			/* Other services */
+			lcf_sr_push_frame(&filter.soh_rst_fsm, &frame);
 		}
 
 		if (leaf_can_filter_hal_recv_frame(1, &frame)) {
 			leaf_can_filter_process_frame(&filter, &frame);
 			leaf_can_filter_hal_send_frame(0, &frame);
+
+			/* Other services */
+			lcf_sr_push_frame(&filter.soh_rst_fsm, &frame);
 		}
 
+		/* Other services */
+		if (lcf_sr_pop_frame(&filter.soh_rst_fsm, &frame)) {
+			leaf_can_filter_hal_send_frame(0, &frame);
+			leaf_can_filter_hal_send_frame(1, &frame);
+		}
+
+		/* Other system stuff */
 		leaf_can_filter_fs_update(&filter, delta_time_ms);
 
 		leaf_can_filter_check_softreset_sequence(&filter,

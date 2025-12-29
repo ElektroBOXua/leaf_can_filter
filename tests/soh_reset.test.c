@@ -1,4 +1,4 @@
-#include "leaf_soh_reset_fsm.h"
+#include "leaf_can_filter.h"
 #include <stdio.h>
 
 struct lcf_sr sr;
@@ -206,6 +206,8 @@ void lcf_sr_test_timeout(struct lcf_sr *self)
 
 	lcf_sr_step(self, 1);
 	assert(self->_state == LCF_SR_STATE_STOPPED);
+
+	assert(lcf_sr_get_status(self) == LCF_SR_STATUS_TIMEOUT);
 }
 
 void lcf_sr_test_example_log(struct lcf_sr *self)
@@ -243,6 +245,8 @@ void lcf_sr_test_example_log(struct lcf_sr *self)
 
 		/* printf("timer: %u\n", timer_ms); */
 	}
+
+	assert(lcf_sr_get_status(self) == LCF_SR_STATUS_SUCCEED);
 }
 
 int main()

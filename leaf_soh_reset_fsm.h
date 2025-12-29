@@ -1,14 +1,22 @@
+#pragma once
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-
-#include <leaf_can_filter.h>
 
 /* ISO-TP leaf can filter SOH reset hardcoded emulation */
 #define LCF_SR_HEARTBEAT_RATE_MS 2000u
 #define LCF_SR_TX_ID 0x79Bu
 #define LCF_SR_RX_ID 0x7BBu
 #define LCF_SR_RX_TIMEOUT_MS 2000u
+
+enum lcf_sr_status {
+	LCF_SR_STATUS_STOPPED,
+	LCF_SR_STATUS_ACTIVE,
+	LCF_SR_STATUS_SUCCEED,
+	LCF_SR_STATUS_FAILED,
+	LCF_SR_STATUS_TIMEOUT
+};
 
 enum lcf_sr_state {
 	LCF_SR_STATE_STOPPED,
@@ -34,6 +42,7 @@ enum lcf_sr_state {
 
 struct lcf_sr {
 	uint8_t _state;
+	uint8_t _status;
 
 	uint32_t _heartbeat_clock_ms;
 
@@ -49,6 +58,7 @@ struct lcf_sr {
 void lcf_sr_init(struct lcf_sr *self)
 {
 	self->_state = 0u;
+	self->_status = LCF_SR_STATUS_STOPPED;
 
 	self->_heartbeat_clock_ms =  LCF_SR_HEARTBEAT_RATE_MS;
 
@@ -108,12 +118,25 @@ void lcf_sr_start(struct lcf_sr *self)
 	lcf_sr_init(self);
 
 	self->_state = LCF_SR_STATE_IDLE;
+	self->_status = LCF_SR_STATUS_ACTIVE;
 }
 
-/** Silently fails */
-void lcf_sr_abort(struct lcf_sr *self)
+void lcf_sr_stop(struct lcf_sr *self)
 {
 	lcf_sr_init(self);
+
+	self->_status = LCF_SR_STATUS_STOPPED;
+}
+
+void lcf_sr_abort(struct lcf_sr *self, uint8_t status)
+{
+	lcf_sr_init(self);
+	self->_status = status;
+}
+
+uint8_t lcf_sr_get_status(struct lcf_sr *self)
+{
+	return self->_status;
 }
 
 bool _lcf_sr_validate_response(struct lcf_sr *self, uint8_t *expec, size_t len)
@@ -122,7 +145,7 @@ bool _lcf_sr_validate_response(struct lcf_sr *self, uint8_t *expec, size_t len)
 
 	/* Abort if no response */
 	if (self->_timeout_ms >= LCF_SR_RX_TIMEOUT_MS) {
-		lcf_sr_abort(self);
+		lcf_sr_abort(self, LCF_SR_STATUS_TIMEOUT);
 
 	/* Ignore if no rx */
 	} else if (!self->_has_rx) {
@@ -132,7 +155,7 @@ bool _lcf_sr_validate_response(struct lcf_sr *self, uint8_t *expec, size_t len)
 
 	/* Abort if invalid response */
 	} else if (memcmp(self->_rx.data, expec, len) != 0) {
-		lcf_sr_abort(self);
+		lcf_sr_abort(self, LCF_SR_STATUS_FAILED);
 
 	/* Everything is fine in any other case */
 	} else {
@@ -282,7 +305,8 @@ void _lcf_sr_step(struct lcf_sr *self, uint32_t delta_time_ms)
 		}
 
 		self->_timer_ms = 0u;
-		lcf_sr_abort(self); /* Final step */
+		lcf_sr_stop(self); /* Final step */
+		self->_status = LCF_SR_STATUS_SUCCEED;
 
 		break;
 	}

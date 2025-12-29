@@ -60,6 +60,9 @@ enum leaf_can_filter_web_msg_type {
 
 	LEAF_CAN_FILTER_WEB_MSG_TYPE_BMS_VER,
 
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_RESET,
+	LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_RESET_STAT,
+
 	LEAF_CAN_FILTER_WEB_MSG_MAX
 };
 
@@ -134,6 +137,10 @@ void leaf_can_filter_web_send_initial_msg(struct leaf_can_filter *self)
 	narr = array.add<JsonArray>();
 	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_BMS_VER);
 	narr.add(self->settings.bms_version_override);
+
+	narr = array.add<JsonArray>();
+	narr.add(LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_RESET_STAT);
+	narr.add(lcf_sr_get_status(&self->soh_rst_fsm));
 
 	serializeJson(array, serialized);
 	web_socket.textAll(serialized.c_str());
@@ -219,6 +226,11 @@ void leaf_can_filter_web_recv_msg(struct leaf_can_filter *self,
 	case LEAF_CAN_FILTER_WEB_MSG_TYPE_BMS_VER:
 		self->settings.bms_version_override = value.as<int>();
 		leaf_can_filter_fs_save(self);
+		return;
+
+	case LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_RESET:
+		/* Start SOH reset FSM */
+		lcf_sr_start(&self->soh_rst_fsm);
 		return;
 
 	default:

@@ -57,8 +57,9 @@ body {
 }
 
 .pane_text {
+	text-wrap: auto;
 	padding: 0.2em;
-	font-size: 2em;
+	font-size: 1.5em;
 }
 
 .pane_tool {
@@ -641,7 +642,18 @@ function regulator_create(parent)
  * EXTRA
  ***********************************************/
 /** Create network instance for widgets. */
-var net = new network("@ENV:OTA_IP", 10000);
+var net;
+
+try {
+	// Primary attempt: Using the environment variable
+	net = new network("@ENV:OTA_IP", 10000);
+	console.log("init network using primary IP.");
+} catch (error) {
+	// Fallback attempt: Run this if the first one fails
+	console.warn("primary network init failed, switching to backup...");
+	net = new network("7.7.7.7", 10000);
+	console.log("init network using backup IP.");
+}
 
 function loading_create(parent)
 {
@@ -722,6 +734,8 @@ function action_applier_create(id, parent, caption, toolbar, confirmation_text)
 		no.set_text('Ні');
 		no.click_actions.click = function() { popup.remove() };
 	};
+
+	return pane;
 };
 
 /* On disconnect */
@@ -760,8 +774,11 @@ const LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY          = 8;
 /* Debug purposes only */
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_IDX  = 9;
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY_OVERRIDE_LBC01_BYTE = 10;
-
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_BMS_VER                 = 11;
+
+/* Call SOH reset service */
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_RESET               = 12;
+const LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_RESET_STAT          = 13;
 
 function status_widget_create(id, parent)
 {
@@ -871,6 +888,23 @@ paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_MULTIPLIER, l, 0.0, 3.0,
 
 paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_BMS_VER, l, 0.0, 3.0, 1.0,
 		       'Версія BMS (0 = автоматично)');
+
+/* Action applier with status (awful...) */
+let a = action_applier_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_RESET, l, 'Reset SOH', '&#10227',
+		      'Увага, будь яка діагностика повинна бути вимкнена!');
+net.add_listener(a.toolbar, LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_RESET_STAT);
+a.toolbar.net.recv = function(data) {
+	const stat = parseInt(data);
+
+	let stat_str = "unknown";
+
+	if (stat <= 4) {
+		stat_str = ["stopped", "active", "succeed", "failed", "timeout"][stat];
+	}
+
+	a.toolbar.set_text('(' + stat_str + ') ' + '&#10227');
+};
+a.toolbar.set_size(2);
 
 action_applier_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP, l, 'Вимкнення Wi-Fi', '&#128225',
 		      'Бажаєте вимкнути WiFi?');

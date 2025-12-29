@@ -15,8 +15,9 @@ struct leaf_can_filter_frame {
 	uint8_t  data[8];
 };
 
-/* leafSpy can filter depend on struct leaf_can_filter_frame */
+/* Depend on struct leaf_can_filter_frame */
 #include "leafspy_can_filter.h"
+#include "leaf_soh_reset_fsm.h"
 
 /******************************************************************************
  * Version sniffer to decide which vehicle version is used
@@ -207,6 +208,9 @@ struct leaf_can_filter {
 	bool clim_ctl_recirc;
 	bool clim_ctl_fresh_air;
 	bool clim_ctl_btn_alert;
+
+	/* Soh reset FSM */
+	struct lcf_sr soh_rst_fsm;
 };
 
 /******************************************************************************
@@ -668,6 +672,8 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 	self->clim_ctl_recirc    = false;
 	self->clim_ctl_fresh_air = false;
 	self->clim_ctl_btn_alert = false;
+
+	lcf_sr_init(&self->soh_rst_fsm);
 }
 
 void leaf_can_filter_process_frame(struct leaf_can_filter *self,
@@ -704,6 +710,7 @@ void leaf_can_filter_update(struct leaf_can_filter *self,
 	if (self->settings.bypass == false) {
 		_leaf_can_filter_update(self, delta_time_ms);
 		leaf_version_sniffer_step(&self->lvs, delta_time_ms);
+		lcf_sr_step(&self->soh_rst_fsm, delta_time_ms);
 	}
 }
 
