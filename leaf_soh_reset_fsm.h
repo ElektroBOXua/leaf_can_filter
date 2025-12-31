@@ -25,6 +25,10 @@ enum lcf_sr_state {
 	/*LCF_SR_STATE_UDS_SESSION_START
 	LCF_SR_STATE_UDS_SESSION_START_RESPONSE*/
 
+	/* Privileged session */
+	LCF_SR_STATE_UDS_SESSION_PRIVIL,
+	LCF_SR_STATE_UDS_SESSION_PRIVIL_RESPONSE,
+
 	/* Heartbeat */
 	LCF_SR_STATE_UDS_TESTER_PRESENT,
 	LCF_SR_STATE_UDS_TESTER_PRESENT_RESPONSE,
@@ -187,7 +191,7 @@ void _lcf_sr_step(struct lcf_sr *self, uint32_t delta_time_ms)
 	switch (state) {
 	case LCF_SR_STATE_IDLE:
 		if (self->_timer_ms >= (LCF_SR_HEARTBEAT_RATE_MS + 500u)) {
-			self->_state = LCF_SR_STATE_UDS_CALL_SERVICE0;
+			self->_state = LCF_SR_STATE_UDS_SESSION_PRIVIL;
 		}
 
 		break;
@@ -216,6 +220,37 @@ void _lcf_sr_step(struct lcf_sr *self, uint32_t delta_time_ms)
 
 		self->_state = LCF_SR_STATE_IDLE;
 
+		break;
+	}
+
+	case LCF_SR_STATE_UDS_SESSION_PRIVIL: {
+		uint8_t data[8] = {0x02u, 0x10u, 0xC0u, 0xFFu,
+				   0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+		/* Wait 50ms before service call */
+		if (self->_timer_ms < 50u) {
+			break;
+		}
+
+		_lcf_sr_push_tx(self, data, 8u);
+
+		self->_timeout_ms = 0u;
+		self->_state = LCF_SR_STATE_UDS_SESSION_PRIVIL_RESPONSE;
+		break;
+	}
+
+	case LCF_SR_STATE_UDS_SESSION_PRIVIL_RESPONSE: {
+		uint8_t expec[8] = {0x02u, 0x50u, 0xC0u, 0xFFu,
+				    0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+		self->_timeout_ms += delta_time_ms;
+
+		if (!_lcf_sr_validate_response(self, expec, sizeof(expec))) {
+			break;
+		}
+
+		self->_timer_ms = 0u;
+		self->_state    = LCF_SR_STATE_UDS_CALL_SERVICE0;
 		break;
 	}
 
