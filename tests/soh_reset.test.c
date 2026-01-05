@@ -11,7 +11,9 @@ struct example_frame {
 	uint8_t  data[8u];
 };
 
-struct example_frame example_frames[14] = {
+#define EXAMPLE_FRAMES_MAX 20u
+
+struct example_frame example_frames[EXAMPLE_FRAMES_MAX] = {
 	{ 0001.205795, 0x0000079Bu, 8u, { 0x02u, 0x3Eu, 0x01u, 0xFFu,
 					  0xFFu, 0xFFu, 0xFFu, 0xFFu } },
 
@@ -31,6 +33,26 @@ struct example_frame example_frames[14] = {
 	{ 0004.012318, 0x000007BBu, 8u, { 0x02u, 0x50u, 0xC0u, 0xFFu,
 					  0xFFu, 0xFFu, 0xFFu, 0xFFu } },
 	/* END   Enter privileged mode (manually inserted) */
+
+	/* BEGIN Enter security (manually inserted) */
+	{ 0004.020000, 0x0000079Bu, 8u, { 0x02u, 0x27u, 0x65u, 0xFFu,
+					  0xFFu, 0xFFu, 0xFFu, 0xFFu } },
+
+	{ 0004.030000, 0x000007BBu, 8u, { 0x06u, 0x67u, 0x65u, 0x09u,
+					  0x26u, 0xBAu, 0xBAu, 0xFFu } },
+
+	{ 0004.040000, 0x0000079Bu, 8u, { 0x10u, 0x0Au, 0x27u, 0x66u,
+					  0x77u, 0x1Fu, 0x7Cu, 0x9Bu } },
+
+	{ 0004.050000, 0x000007BBu, 8u, { 0x30u, 0x01u, 0x00u, 0xFFu,
+					  0xFFu, 0xFFu, 0xFFu, 0xFFu } },
+
+	{ 0004.060000, 0x0000079Bu, 8u, { 0x21u, 0x1Fu, 0x82u, 0x7Cu,
+					  0x3Eu, 0xFFu, 0xFFu, 0xFFu } },
+
+	{ 0004.070000, 0x000007BBu, 8u, { 0x02u, 0x67u, 0x66u, 0xFFu,
+					  0xFFu, 0xFFu, 0xFFu, 0xFFu } },
+	/* END Enter security (manually inserted) */
 
 	{ 0004.088432, 0x0000079Bu, 8u, { 0x03u, 0x31u, 0x03u, 0x00u,
 					  0xFFu, 0xFFu, 0xFFu, 0xFFu } },
@@ -134,7 +156,7 @@ void lcf_sr_test_privil_enter(struct lcf_sr *self)
 	assert(lcf_sr_pop_frame(self, &f) == false);
 
 	/* eval LCF_SR_STATE_UDS_CALL_*** */
-	lcf_sr_step(self, 0u);
+	lcf_sr_step(self, LCF_SR_RX_TIMEOUT_MS);
 	assert(lcf_sr_pop_frame(self, &f) == true);
 	assert(!memcmp(f.data, tx, 8u));
 	assert(lcf_sr_pop_frame(self, &f) == false);
@@ -145,6 +167,80 @@ void lcf_sr_test_privil_enter(struct lcf_sr *self)
 	memcpy(f.data, rx, 8u);
 	assert(lcf_sr_push_frame(self, &f) == true);
 	/* eval LCF_SR_STATE_UDS_CALL_***_RESPONSE */
+	lcf_sr_step(self, 0u);
+}
+
+/*
+	LCF_SR_STATE_UDS_REQUEST_SECURITY,
+	LCF_SR_STATE_UDS_REQUEST_SECURITY_RESPONSE,
+*/
+void lcf_sr_test_request_security(struct lcf_sr *self)
+{
+	uint8_t tx[8] = {0x02u, 0x27u, 0x65u, 0xFFu,
+			 0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+	/* Example seed challenge from real data */
+	uint8_t rx[8] = {0x06u, 0x67u, 0x65u, 0x09u,
+			 0x26u, 0xBAu, 0xBAu, 0xFFu};
+
+	struct leaf_can_filter_frame f;
+	(void)memset(&f, 0u, sizeof(struct leaf_can_filter_frame));
+
+	assert(lcf_sr_pop_frame(self, &f) == false);
+
+	/* eval LCF_SR_STATE_UDS_*** */
+	lcf_sr_step(self, LCF_SR_RX_TIMEOUT_MS);
+	assert(lcf_sr_pop_frame(self, &f) == true);
+	assert(!memcmp(f.data, tx, 8u));
+	assert(lcf_sr_pop_frame(self, &f) == false);
+
+	/* Put positive response */
+	f.id  = LCF_SR_RX_ID;
+	f.len = 8u;
+	memcpy(f.data, rx, 8u);
+	assert(lcf_sr_push_frame(self, &f) == true);
+	/* eval LCF_SR_STATE_UDS_***_RESPONSE */
+	lcf_sr_step(self, 0u);
+}
+
+/*	LCF_SR_STATE_UDS_SEND_SOLVED_CHALLENGE,
+	LCF_SR_STATE_UDS_SEND_SOLVED_CHALLENGE_RESPONSE,
+*/
+void lcf_sr_test_send_solved_challenge(struct lcf_sr *self)
+{
+	uint8_t tx0[8] = {0x10u, 0x0Au, 0x27u, 0x66u,
+			  0x77u, 0x1Fu, 0x7Cu, 0x9Bu};
+
+	uint8_t tx1[8] = {0x21u, 0x1Fu, 0x82u, 0x7Cu,
+			  0x3Eu, 0xFFu, 0xFFu, 0xFFu};
+
+	/* Example seed challenge from real data */
+	uint8_t rx[8] = {0x02u, 0x67u, 0x66u, 0xFFu,
+			 0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+	struct leaf_can_filter_frame f;
+	(void)memset(&f, 0u, sizeof(struct leaf_can_filter_frame));
+
+	assert(lcf_sr_pop_frame(self, &f) == false);
+
+	/* eval LCF_SR_STATE_UDS_*** */
+	lcf_sr_step(self, LCF_SR_RX_TIMEOUT_MS);
+	assert(lcf_sr_pop_frame(self, &f) == true);
+	assert(!memcmp(f.data, tx0, 8u));
+	assert(lcf_sr_pop_frame(self, &f) == false);
+
+	/* eval LCF_SR_STATE_UDS_*** */
+	lcf_sr_step(self, LCF_SR_RX_TIMEOUT_MS);
+	assert(lcf_sr_pop_frame(self, &f) == true);
+	assert(!memcmp(f.data, tx1, 8u));
+	assert(lcf_sr_pop_frame(self, &f) == false);
+
+	/* Put positive response */
+	f.id  = LCF_SR_RX_ID;
+	f.len = 8u;
+	memcpy(f.data, rx, 8u);
+	assert(lcf_sr_push_frame(self, &f) == true);
+	/* eval LCF_SR_STATE_UDS_***_RESPONSE */
 	lcf_sr_step(self, 0u);
 }
 
@@ -162,7 +258,7 @@ void lcf_sr_test_service0(struct lcf_sr *self)
 	assert(lcf_sr_pop_frame(self, &f) == false);
 
 	/* eval LCF_SR_STATE_UDS_CALL_*** */
-	lcf_sr_step(self, 0u);
+	lcf_sr_step(self, LCF_SR_RX_TIMEOUT_MS);
 	assert(lcf_sr_pop_frame(self, &f) == true);
 	assert(!memcmp(f.data, tx, 8u));
 	assert(lcf_sr_pop_frame(self, &f) == false);
@@ -256,7 +352,7 @@ void lcf_sr_test_example_log(struct lcf_sr *self)
 	lcf_sr_init(self);
 	lcf_sr_start(self);
 
-	for (i = 0u; i < 14; i++) {
+	for (i = 0u; i < EXAMPLE_FRAMES_MAX; i++) {
 		uint32_t timestamp_s = (example_frames[i].timestamp_s * 1000);
 
 		while (timer_ms <= timestamp_s) {
@@ -290,6 +386,8 @@ int main()
 	lcf_sr_init(&sr);
 	lcf_sr_test_heartbeat(&sr);
 	lcf_sr_test_privil_enter(&sr);
+	lcf_sr_test_request_security(&sr);
+	lcf_sr_test_send_solved_challenge(&sr);
 	lcf_sr_test_service0(&sr);
 	lcf_sr_test_service1(&sr);
 	lcf_sr_test_uds_session_def(&sr);

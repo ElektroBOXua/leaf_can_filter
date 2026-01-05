@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "lcf_keygen.h"
+
 /* ISO-TP leaf can filter SOH reset hardcoded emulation */
 #define LCF_SR_HEARTBEAT_RATE_MS 2000u
 #define LCF_SR_TX_ID 0x79Bu
@@ -28,6 +30,12 @@ enum lcf_sr_state {
 	/* Privileged session */
 	LCF_SR_STATE_UDS_SESSION_PRIVIL,
 	LCF_SR_STATE_UDS_SESSION_PRIVIL_RESPONSE,
+
+	/* Request access to secured functions */
+	LCF_SR_STATE_UDS_REQUEST_SECURITY,
+	LCF_SR_STATE_UDS_REQUEST_SECURITY_RESPONSE,
+	LCF_SR_STATE_UDS_SEND_SOLVED_CHALLENGE,
+	LCF_SR_STATE_UDS_SEND_SOLVED_CHALLENGE_RESPONSE,
 
 	/* Heartbeat */
 	LCF_SR_STATE_UDS_TESTER_PRESENT,
@@ -57,6 +65,10 @@ struct lcf_sr {
 
 	uint32_t _timeout_ms;
 	uint32_t _timer_ms;
+
+	uint32_t _incoming_challenge;
+	uint8_t  _solved_challenge[8];
+	uint8_t  _sn;
 };
 
 void lcf_sr_init(struct lcf_sr *self)
@@ -143,7 +155,9 @@ uint8_t lcf_sr_get_status(struct lcf_sr *self)
 	return self->_status;
 }
 
-bool _lcf_sr_validate_response(struct lcf_sr *self, uint8_t *expec, size_t len)
+/* Prevalidate (validate everything ecept payload) */
+bool _lcf_sr_pre_validate_response(struct lcf_sr *self, uint8_t *expec,
+				   size_t len)
 {
 	bool result = false;
 
@@ -157,16 +171,29 @@ bool _lcf_sr_validate_response(struct lcf_sr *self, uint8_t *expec, size_t len)
 	/* Ignore if invalid message */
 	} else if ((self->_rx.len < len) || (self->_rx.data[0] != expec[0])) {
 
-	/* Abort if invalid response */
-	} else if (memcmp(self->_rx.data, expec, len) != 0) {
-		lcf_sr_abort(self, LCF_SR_STATUS_FAILED);
-
 	/* Everything is fine in any other case */
 	} else {
 		result = true;
 	}
 
 	self->_has_rx = false;
+
+	return result;
+}
+
+/* validate (validate everything + payload) */
+bool _lcf_sr_validate_response(struct lcf_sr *self, uint8_t *expec, size_t len)
+{
+	bool result = false;
+
+	if (_lcf_sr_pre_validate_response(self, expec, len))
+	{
+		if (memcmp(self->_rx.data, expec, len) != 0) {
+			lcf_sr_abort(self, LCF_SR_STATUS_FAILED);
+		} else {
+			result = true;
+		}
+	}
 
 	return result;
 }
@@ -241,6 +268,106 @@ void _lcf_sr_step(struct lcf_sr *self, uint32_t delta_time_ms)
 
 	case LCF_SR_STATE_UDS_SESSION_PRIVIL_RESPONSE: {
 		uint8_t expec[8] = {0x02u, 0x50u, 0xC0u, 0xFFu,
+				    0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+		self->_timeout_ms += delta_time_ms;
+
+		if (!_lcf_sr_validate_response(self, expec, sizeof(expec))) {
+			break;
+		}
+
+		self->_timer_ms = 0u;
+		self->_state    = LCF_SR_STATE_UDS_REQUEST_SECURITY;
+		break;
+	}
+
+	case LCF_SR_STATE_UDS_REQUEST_SECURITY: {
+		uint8_t data[8] = {0x02u, 0x27u, 0x65u, 0xFFu,
+				   0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+		if (self->_timer_ms < 10u) {
+			break;
+		}
+
+		_lcf_sr_push_tx(self, data, 8u);
+
+		self->_timeout_ms = 0u;
+		self->_state = LCF_SR_STATE_UDS_REQUEST_SECURITY_RESPONSE;
+		break;
+	}
+
+	case LCF_SR_STATE_UDS_REQUEST_SECURITY_RESPONSE: {
+		uint8_t expec[8] = {0x06u, 0x67u, 0x65u, 0xFFu,
+				    0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+		self->_timeout_ms += delta_time_ms;
+
+		if (!_lcf_sr_pre_validate_response(self, expec, sizeof(expec)))
+		{
+			break;
+		}
+
+		/* Receive challenge seed */
+		self->_incoming_challenge = (self->_rx.data[3] << 24u) |
+					    (self->_rx.data[4] << 16u) |
+					    (self->_rx.data[5] << 8u)  |
+					    (self->_rx.data[6] << 0u);
+
+		decodeChallengeData(self->_incoming_challenge,
+				    self->_solved_challenge);
+
+		self->_sn = 0; /* iso-tp consecutive frame sequence num */
+
+		self->_timer_ms = 0u;
+		self->_state = LCF_SR_STATE_UDS_SEND_SOLVED_CHALLENGE;
+		break;
+
+	}
+
+	case LCF_SR_STATE_UDS_SEND_SOLVED_CHALLENGE: {
+		/* Wait ms */
+		if (self->_timer_ms < 10u) {
+			break;
+		}
+
+		if (self->_sn == 0u) {
+			uint8_t data[8] = {0x10u, 0x0Au, 0x27u, 0x66u,
+					   0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+			(void)memcpy(&data[4], self->_solved_challenge, 4u);
+
+			_lcf_sr_push_tx(self, data, 8u);
+
+			self->_sn += 1u;
+
+			/* Repeat */
+			self->_timer_ms = 0u;
+			break;
+
+			/* We don't await flow control response from vehicle
+			 * at the moment... TODO */
+		} else if (self->_sn == 1u) {
+			uint8_t data[8] = {0x21u, 0xFFu, 0xFFu, 0xFFu,
+					   0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+			(void)memcpy(&data[1], &self->_solved_challenge[4u],
+				     4u);
+
+			_lcf_sr_push_tx(self, data, 8u);
+
+			self->_sn += 1u;
+
+			/* Discard any RX at this point (FlowControl) */
+			self->_has_rx = false;
+		} else {}
+
+		self->_timeout_ms = 0u;
+		self->_state = LCF_SR_STATE_UDS_SEND_SOLVED_CHALLENGE_RESPONSE;
+		break;
+	}
+
+	case LCF_SR_STATE_UDS_SEND_SOLVED_CHALLENGE_RESPONSE: {
+		uint8_t expec[8] = {0x02u, 0x67u, 0x66u, 0xFFu,
 				    0xFFu, 0xFFu, 0xFFu, 0xFFu};
 
 		self->_timeout_ms += delta_time_ms;
