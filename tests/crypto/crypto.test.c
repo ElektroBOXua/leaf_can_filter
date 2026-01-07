@@ -14,9 +14,15 @@ uint8_t  solved_challenge[8u] = { 0 };
 int main()
 {
 	decodeChallengeData(incoming_challenge_example, solved_challenge);
+	_lcf_keygen_solve_battery_challenge(incoming_challenge_example,
+					    solved_challenge);
 
 	/* solved_challenge must match exactly solved_challenge_example */
 	assert(!memcmp(solved_challenge_example, solved_challenge, 8u));
+
+	
+	assert(_lcf_keygen_hash_u16(0x1234, 0x8421) ==
+		CyclicXorHash16Bit(0x1234, 0x8421));
 
 	return 0;
 }
