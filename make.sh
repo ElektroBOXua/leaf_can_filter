@@ -12,6 +12,7 @@ export OTA_IP="7.7.7.7"
 export TARGET_NAME="LeafBOX"
 export TARGET=leaf_can_filter_esp32c6_hw1
 #export TARGET=leaf_can_filter_esp32c6_hw1_zero
+export TARGET_LANG="uk-UA";
 
 #EXTRA_FLAGS="-v"
 
@@ -51,6 +52,19 @@ mk_base64_updater()
 	# Generate updater html file (with embedded base64 firmware)
 	../awk/ENV.awk ../web/updater.html > \
 		     build/"$BOARD_PATH"/"$TARGET"_"$GIT_REPO_VERSION".html
+}
+
+mk_web_interface()
+{
+	export LANG=$(cat web/$1.json) # Select language based on choice
+
+	echo "Building web..."
+
+	# Replace environment variables inside web page
+	awk/ENV.awk web/index.html > build/index.html
+
+	# Compress WEB
+	gzip -9 -c build/index.html > build/index.html.gz
 }
 
 compile() {
@@ -94,14 +108,7 @@ compile() {
 	cp libraries/charge_counter/charge_counter.h build/
 	cp libraries/iso_tp/iso_tp.h                 build/
 
-	echo "Building web..."
-
-	# Replace environment variables inside web page
-	awk/ENV.awk web/index.html >> build/index.html
-
-	# Compress WEB
-	gzip -9 -c build/index.html >> build/index.html.gz
-
+	mk_web_interface ${TARGET_LANG}
 
 	echo "Compiling..."
 
