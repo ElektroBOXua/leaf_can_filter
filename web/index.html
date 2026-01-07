@@ -646,8 +646,16 @@ var net;
 
 const LANG = @ENV:LANG;
 
-function tr(key) {
-    return (LANG && LANG[key]) ? LANG[key] : key;
+function tr(key, ...args) {
+	let text = (LANG && LANG[key]) ? LANG[key] : key;
+
+	if (args.length === 0) return text;
+
+	args.forEach((arg, i) => {
+		text = text.replace(`%${i + 1}`, arg);
+	});
+
+	return text;
 }
 
 try {
