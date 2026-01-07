@@ -432,6 +432,8 @@ void leaf_can_filter_web_stop()
     	WiFi.mode(WIFI_OFF);
 }
 
+extern TaskHandle_t xWebTaskHandle;
+
 void leaf_can_filter_web_update(struct leaf_can_filter *self,
 				uint32_t delta_time_ms)
 {
@@ -459,6 +461,7 @@ void leaf_can_filter_web_update(struct leaf_can_filter *self,
 
 			/* Terminate current task */
 			vTaskDelete(NULL);
+			xWebTaskHandle = NULL;
 
 			wifi_stop_is_stopped = true;
 		}

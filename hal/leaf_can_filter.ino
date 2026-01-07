@@ -31,6 +31,7 @@ struct delta_time dt;
 struct leaf_can_filter filter;
 SemaphoreHandle_t _filter_mutex; /* prevent filter update from other tasks
 				    during loop */
+TaskHandle_t xWebTaskHandle = NULL;
 
 void leaf_can_filter_web_task(void *pv_parameters)
 {
@@ -64,8 +65,8 @@ void leaf_can_filter_check_softreset_sequence(struct leaf_can_filter *self,
 		reset_trigger_timer = 0u;
 	}
 
-	/* If no CC buttons been pressed in past 5s */
-	if (reset_trigger_timer < 5000u) {
+	/* If no CC buttons been pressed in past second(-s) */
+	if (reset_trigger_timer < 1000u) {
 		reset_trigger_timer += delta_time_ms;
 	} else {
 		/* Reset counter */
@@ -74,6 +75,13 @@ void leaf_can_filter_check_softreset_sequence(struct leaf_can_filter *self,
 
 	/* If CC buttons was pressed 10 times in past 5 seconds */
 	if (reset_trigger_counter >= 10u) {
+		if (xWebTaskHandle == NULL) {
+			xTaskCreate(leaf_can_filter_web_task, "web", 10000,
+				    NULL, 1, &xWebTaskHandle);
+		}
+	}
+
+	if (reset_trigger_counter >= 20u) {
 		ESP.restart();
 	}
 }
@@ -97,7 +105,11 @@ void setup()
 
 	/* Init web interface */
 	leaf_can_filter_web_init(&filter);
-	xTaskCreate(leaf_can_filter_web_task, "web", 10000, NULL, 1, NULL);
+
+	if (xWebTaskHandle == NULL) {
+		xTaskCreate(leaf_can_filter_web_task, "web", 10000, NULL, 1,
+			    &xWebTaskHandle);
+	}
 }
 
 void loop()
