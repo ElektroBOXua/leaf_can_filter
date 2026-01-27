@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Set environment variables
+if [ -z "${GIT_REPO_VERSION+x}" ]; then
+	export GIT_REPO_VERSION=$(git describe --tags)
+fi
+
 ###############################################################################
 # CONFIGURATION:
 ###############################################################################
@@ -22,10 +27,14 @@ export TARGET_LANG="en-US";
 ###############################################################################
 
 if [ "$TARGET" == "leaf_can_filter_esp32c6_hw1" ]; then
+	export __CAN_FILTER_VERSION__="h2_$GIT_REPO_VERSION"
+
 	BOARD=esp32:esp32:esp32c6
 	FQBN=:CDCOnBoot=cdc
 	echo "#define CAN_FILTER_ESP32C6_SUPER_MINI" > target.gen.h
 elif [ "$TARGET" == "leaf_can_filter_esp32c6_hw1_zero" ]; then
+	export __CAN_FILTER_VERSION__="hz_$GIT_REPO_VERSION"
+
 	BOARD=esp32:esp32:esp32c6
 	FQBN=:CDCOnBoot=cdc
 	echo "#define CAN_FILTER_ESP32C6_ZERO" > target.gen.h
@@ -34,14 +43,11 @@ else
 	exit 1
 fi
 
+echo "#define __CAN_FILTER_VERSION__ \"leaf_can_filter_$__CAN_FILTER_VERSION__\"" >> target.gen.h
+
 ###############################################################################
 # MAIN
 ###############################################################################
-# Set environment variables
-if [ -z "${GIT_REPO_VERSION+x}" ]; then
-	export GIT_REPO_VERSION=$(git describe --tags)
-fi
-
 mk_base64_updater()
 {
 	local BOARD_PATH="${BOARD//:/\.}"  # Replace ':' with '.'
@@ -52,7 +58,7 @@ mk_base64_updater()
 
 	# Generate updater html file (with embedded base64 firmware)
 	../awk/ENV.awk ../web/updater.html > \
-		     build/"$BOARD_PATH"/"$TARGET"_"$GIT_REPO_VERSION".html
+		     build/"$BOARD_PATH"/"leaf_can_filter_$__CAN_FILTER_VERSION__".html
 }
 
 mk_web_interface()

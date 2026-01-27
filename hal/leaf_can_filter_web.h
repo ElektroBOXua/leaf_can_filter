@@ -414,12 +414,22 @@ void leaf_can_filter_web_init(struct leaf_can_filter *self)
 	web_server.on("/update", HTTP_OPTIONS,
 		      web_server_handle_cors_preflight);
 
+	web_server.on("/version", HTTP_GET, [](AsyncWebServerRequest *request) {
+		if (LittleFS.exists("/version.txt")) {
+			request->send(LittleFS, "/version.txt", "text/plain");
+		} else {
+			// Fallback to the compiled constant if the file doesn't exist yet
+			request->send(200, "text/plain", __CAN_FILTER_VERSION__);
+		}
+	});
+
 	web_socket.onEvent(web_socket_handler);
 	web_server.addHandler(&web_socket);
 	
 	web_server.begin();
 
 	/* DNS */
+	dns_server.setErrorReplyCode(DNSReplyCode::NoError);
 	dns_server.start(53, "*", WiFi.softAPIP());
 }
 

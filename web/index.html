@@ -926,6 +926,6 @@ action_applier_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP, l, 'LC_WIFI_OFF_TI
 action_applier_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_CPU_RESET, l, 'LC_REBOOT_TITLE', '&#8635',
 		      'LC_REBOOT_CONFIRM');
 
-firmware_updater_create(l, '@ENV:GIT_REPO_VERSION');
+firmware_updater_create(l, '@ENV:__CAN_FILTER_VERSION__');
 </script>
 </html>
