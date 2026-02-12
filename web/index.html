@@ -730,7 +730,7 @@ function action_applier_create(id, parent, caption, toolbar, confirmation_text)
 	pane.toolbar.set_text(toolbar);
 	pane.toolbar.set_size(3);
 	
-	stop.set_text(tr('LC_RESET_SOH_TITLE'));
+	stop.set_text(tr(caption));
 
 	stop.click_actions.show_dialog = function() {
 		const popup = popup_create(document.body);
