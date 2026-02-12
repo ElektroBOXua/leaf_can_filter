@@ -31,5 +31,7 @@
   "LC_REBOOT_TITLE": "Reboot",
   "LC_REBOOT_CONFIRM": "Do you want to reboot the device?",
   "LC_FIRMWARE_UPDATE_TITLE": "Firmware Update",
-  "LC_FIRMWARE_CONFIRM_BTN": "Confirm"
+  "LC_FIRMWARE_CONFIRM_BTN": "Confirm",
+  "LC_RESET_SOC_TITLE": "Reset SOC to 100%",
+  "LC_RESET_SOC_CONFIRM": "This option will reset SOC(manually set) to 100%"
 }

@@ -10,15 +10,16 @@ fi
 ###############################################################################
 COMPILER="$PWD"/tools/arduino-cli
 
-SERIAL_PORT=COM86
+SERIAL_PORT=COM88
 MONITOR_BAUD=115200
 export OTA_IP="7.7.7.7"
 
 export TARGET_NAME="LeafBOX"
-export TARGET=leaf_can_filter_esp32c6_hw1
-#export TARGET=leaf_can_filter_esp32c6_hw1_zero
-#export TARGET_LANG="uk-UA";
-export TARGET_LANG="en-US";
+#export TARGET=leaf_can_filter_esp32c6_hw2
+#export TARGET=leaf_can_filter_esp32c6_hw_zero
+export TARGET=can_filter_v3_native_esp32c6
+export TARGET_LANG="uk-UA";
+#export TARGET_LANG="en-US";
 
 #EXTRA_FLAGS="-v"
 
@@ -26,18 +27,24 @@ export TARGET_LANG="en-US";
 # TARGETS AVAILABLE
 ###############################################################################
 
-if [ "$TARGET" == "leaf_can_filter_esp32c6_hw1" ]; then
+if [ "$TARGET" == "leaf_can_filter_esp32c6_hw2" ]; then
 	export __CAN_FILTER_VERSION__="h2_$GIT_REPO_VERSION"
 
 	BOARD=esp32:esp32:esp32c6
 	FQBN=:CDCOnBoot=cdc
 	echo "#define CAN_FILTER_ESP32C6_SUPER_MINI" > target.gen.h
-elif [ "$TARGET" == "leaf_can_filter_esp32c6_hw1_zero" ]; then
+elif [ "$TARGET" == "leaf_can_filter_esp32c6_hw_zero" ]; then
 	export __CAN_FILTER_VERSION__="hz_$GIT_REPO_VERSION"
 
 	BOARD=esp32:esp32:esp32c6
 	FQBN=:CDCOnBoot=cdc
 	echo "#define CAN_FILTER_ESP32C6_ZERO" > target.gen.h
+elif [ "$TARGET" == "can_filter_v3_native_esp32c6" ]; then
+	export __CAN_FILTER_VERSION__="h3_$GIT_REPO_VERSION"
+
+	BOARD=esp32:esp32:esp32c6
+	FQBN=:CDCOnBoot=cdc
+	echo "#define CAN_FILTER_V3_NATIVE_ESP32" > target.gen.h
 else
 	echo "Bad target!"
 	exit 1

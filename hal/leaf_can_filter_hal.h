@@ -31,6 +31,15 @@
 #define TWAI_BUS_1_RX GPIO_NUM_3
 #endif
 
+#ifdef CAN_FILTER_V3_NATIVE_ESP32
+#warning ESP32C6_V3 is used!
+#define TWAI_BUS_0_TX GPIO_NUM_18
+#define TWAI_BUS_0_RX GPIO_NUM_19
+
+#define TWAI_BUS_1_TX GPIO_NUM_14
+#define TWAI_BUS_1_RX GPIO_NUM_15
+#endif
+
 static twai_handle_t twai_bus_0;
 static twai_handle_t twai_bus_1;
 

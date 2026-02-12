@@ -793,6 +793,7 @@ const LEAF_CAN_FILTER_WEB_MSG_TYPE_BMS_VER                 = 11;
 /* Call SOH reset service */
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_RESET               = 12;
 const LEAF_CAN_FILTER_WEB_MSG_TYPE_SOH_RESET_STAT          = 13;
+const LEAF_CAN_FILTER_WEB_MSG_RESET_SOC			   = 14;
 
 function status_widget_create(id, parent)
 {
@@ -919,6 +920,9 @@ a.toolbar.net.recv = function(data) {
 	a.toolbar.set_text('(' + stat_str + ') ' + '&#10227');
 };
 a.toolbar.set_size(2);
+
+action_applier_create(LEAF_CAN_FILTER_WEB_MSG_RESET_SOC, l, 'LC_RESET_SOC_TITLE', '&#8635',
+		      'LC_RESET_SOC_CONFIRM');
 
 action_applier_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP, l, 'LC_WIFI_OFF_TITLE', '&#128225',
 		      'LC_WIFI_OFF_CONFIRM');

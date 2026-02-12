@@ -31,5 +31,7 @@
   "LC_REBOOT_TITLE": "Перезавантаження",
   "LC_REBOOT_CONFIRM": "Бажаєте перезавантажити пристрій?",
   "LC_FIRMWARE_UPDATE_TITLE": "Оновлення прошивки",
-  "LC_FIRMWARE_CONFIRM_BTN": "Підтвердити"
+  "LC_FIRMWARE_CONFIRM_BTN": "Підтвердити",
+  "LC_RESET_SOC_TITLE": "Скинути SOC до 100%",
+  "LC_RESET_SOC_CONFIRM": "Дане налаштування скине SOC(встановлений вручну) до 100%"
 }
