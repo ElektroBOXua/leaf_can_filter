@@ -895,6 +895,9 @@ paned_checkbox_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_FILTER_LEAFSPY, l,
 paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_OVERRIDE_KWH, l, 4, 80, 4,
 		       'LC_SET_CAPACITY_KWH');
 
+action_applier_create(LEAF_CAN_FILTER_WEB_MSG_RESET_SOC, l, 'LC_RESET_SOC_TITLE', '&#8635',
+		      'LC_RESET_SOC_CONFIRM');
+
 paned_regulator_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_CAPACITY_FULL_VOLTAGE_V, l, 350, 450, 4,
 		       'LC_SET_FULL_VOLTAGE');
 
@@ -920,9 +923,6 @@ a.toolbar.net.recv = function(data) {
 	a.toolbar.set_text('(' + stat_str + ') ' + '&#10227');
 };
 a.toolbar.set_size(2);
-
-action_applier_create(LEAF_CAN_FILTER_WEB_MSG_RESET_SOC, l, 'LC_RESET_SOC_TITLE', '&#8635',
-		      'LC_RESET_SOC_CONFIRM');
 
 action_applier_create(LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP, l, 'LC_WIFI_OFF_TITLE', '&#128225',
 		      'LC_WIFI_OFF_CONFIRM');

@@ -109,6 +109,7 @@ void leaf_can_filter_hal_esp32_twai_send(twai_handle_t *bus,
 
 	// Configure message to transmit
 	twai_message_t msg;
+	memset(&msg, 0, sizeof(msg));
 		
 	// Message type and format settings
 	// Standard vs extended format
@@ -150,6 +151,7 @@ bool leaf_can_filter_hal_esp32_twai_recv(twai_handle_t *bus,
 	assert(frame != NULL);
 						
 	twai_message_t msg;
+	memset(&msg, 0, sizeof(msg));
 
 	if (twai_receive_v2(*bus, &msg, 0) == ESP_OK &&
 	    msg.data_length_code <= 8) {
@@ -252,6 +254,39 @@ void leaf_can_filter_hal_init()
 	leaf_can_filter_hal_init_esp32_twai(&twai_bus_1);
 }
 
+void log_twai_bus_status(twai_handle_t bus_a, twai_handle_t bus_b) {
+	twai_status_info_t status_a;
+	twai_status_info_t status_b;
+
+	// Retrieve status for both handles
+	if (twai_get_status_info_v2(bus_a, &status_a) != ESP_OK ||
+		twai_get_status_info_v2(bus_b, &status_b) != ESP_OK) {
+		ESP_LOGE(TAG, "Failed to get status info");
+		return;
+	}
+
+	printf("--- TWAI Bus Diagnostics ---\n");
+	printf("%-20s | %-12s | %-12s", "Metric", "Bus A", "Bus B\n");
+	printf("---------------------|--------------|--------------\n");
+	
+	// State (Running, Stopped, Bus-Off)
+	printf("%-20s | %-12d | %-12d", "State\n", status_a.state, status_b.state);
+	
+	// Messages waiting in the software ring buffer
+	printf("%-20s | %-12lu | %-12lu", "Msgs Queued (RX)\n", status_a.msgs_to_rx, status_b.msgs_to_rx);
+	printf("%-20s | %-12lu | %-12lu", "Msgs Queued (TX)\n", status_a.msgs_to_tx, status_b.msgs_to_tx);
+	
+	// Critical: How many messages were lost because the buffer was full
+	printf("%-20s | %-12lu | %-12lu", "RX Overruns\n", status_a.rx_overrun_count, status_b.rx_overrun_count);
+	printf("%-20s | %-12lu | %-12lu", "RX Missed\n"  , status_a.rx_missed_count,  status_b.rx_missed_count);
+	
+	// Hardware Error Counters
+	printf("%-20s | %-12lu | %-12lu", "REC (RX Error)\n", status_a.rx_error_counter, status_b.rx_error_counter);
+	printf("%-20s | %-12lu | %-12lu", "TEC (TX Error)\n", status_a.tx_error_counter, status_b.tx_error_counter);
+	
+	printf("---------------------------------------------------\n");
+}
+
 void leaf_can_filter_hal_update(uint32_t delta_time_ms)
 {
 	uint32_t alerts;
@@ -281,6 +316,21 @@ void leaf_can_filter_hal_update(uint32_t delta_time_ms)
 	}
 
 	leaf_can_filter_hal_update_other(delta_time_ms);
+
+	/* Print stats */
+	/*static uint32_t cycle_counter = 0u;
+	static uint32_t timer2_ms     = 0u;
+
+	timer2_ms += delta_time_ms;
+	cycle_counter++;
+
+	if (timer2_ms >= 5000u) {
+		timer2_ms -= 5000u;
+
+		log_twai_bus_status(twai_bus_0, twai_bus_1);
+		printf("cycle_cnt:  %u\n", cycle_counter);
+		cycle_counter = 0;
+	}*/
 }
 
 bool leaf_can_filter_hal_send_frame(uint8_t bus_id,

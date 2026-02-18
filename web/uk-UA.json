@@ -22,7 +22,7 @@
   "LC_SET_FULL_VOLTAGE": "Напруга повного заряду",
   "LC_SOH_MULTIPLIER": "Встановлення множника SOH (0.0 - 3.0)",
   "LC_BMS_VERSION_SET": "Версія BMS (0 = автоматично)",
-  "LC_RESET_SOH_TITLE": "Reset SOH",
+  "LC_RESET_SOH_TITLE": "Скинути SOH",
   "LC_RESET_SOH_WARNING": "Увага, будь яка діагностика повинна бути вимкнена!",
   "LC_CONFIRM_YES": "Так",
   "LC_CONFIRM_NO": "Ні",
