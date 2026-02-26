@@ -153,6 +153,8 @@ void leaf_can_filter_web_send_update(struct leaf_can_filter *self)
 	leaf_can_filter_web_send_initial_msg(self);
 }
 
+static bool wifi_stop_request = false;
+
 void leaf_can_filter_web_recv_msg(struct leaf_can_filter *self,
 				  AsyncWebSocketClient *sender,
 				  const char *payload)
@@ -201,7 +203,7 @@ void leaf_can_filter_web_recv_msg(struct leaf_can_filter *self,
 		return;
 
 	case LEAF_CAN_FILTER_WEB_MSG_TYPE_WIFI_STOP:
-		/* TODO IMPLEMENT */
+		wifi_stop_request = true;
 		return;
 
 	case LEAF_CAN_FILTER_WEB_MSG_TYPE_BYPASS_EN:
@@ -457,7 +459,6 @@ void leaf_can_filter_web_update(struct leaf_can_filter *self,
 				uint32_t delta_time_ms)
 {
 	/* Automatically off wifi after 5 min inactivity */
-	static bool wifi_stop_is_stopped = false;
 	static uint32_t wifi_stop_timer = 0u;
 
 	/* WS message repeat time */
@@ -475,14 +476,15 @@ void leaf_can_filter_web_update(struct leaf_can_filter *self,
 			wifi_stop_timer = 0u;
 		}
 
-		if (!wifi_stop_is_stopped && wifi_stop_timer >= (60u * 5u)) {
+		if ((wifi_stop_timer >= (60u * 5u)) ||
+		    wifi_stop_request == true) {
+			wifi_stop_request = false;
+			wifi_stop_timer = 0u;
+			
 			leaf_can_filter_web_stop(); 
 
-			/* Terminate current task */
-			vTaskDelete(NULL);
 			xWebTaskHandle = NULL;
-
-			wifi_stop_is_stopped = true;
+			vTaskDelete(NULL);
 		}
 
 		if (xSemaphoreTake(_filter_mutex, portMAX_DELAY) == pdTRUE) {

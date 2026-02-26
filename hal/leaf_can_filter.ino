@@ -37,6 +37,7 @@ void leaf_can_filter_web_task(void *pv_parameters)
 {
 	static struct delta_time dt;
 	delta_time_init(&dt);
+	delta_time_update_ms(&dt, millis());
 
 	while(1) {
 		/* TODO valid arguments */
@@ -75,10 +76,12 @@ void leaf_can_filter_check_softreset_sequence(struct leaf_can_filter *self,
 
 	/* If CC buttons was pressed 10 times in past 5 seconds */
 	if (reset_trigger_counter >= 10u) {
-		if (xWebTaskHandle == NULL) {
+		/*if (xWebTaskHandle == NULL) {
+			printf("[WEBSERVER] Attempt to force start\n");
+			leaf_can_filter_web_init(&filter);
 			xTaskCreate(leaf_can_filter_web_task, "web", 10000,
 				    NULL, 1, &xWebTaskHandle);
-		}
+		}*/ /* buggy!!! */
 	}
 
 	if (reset_trigger_counter >= 20u) {
