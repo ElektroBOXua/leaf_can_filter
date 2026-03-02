@@ -150,6 +150,10 @@ struct leaf_bms_vars {
 	uint8_t remain_cap_bars;
 
 	uint8_t soh;
+
+	float charge_power_limit_kwt;
+	float max_power_for_charger_kwt;
+	float temperature_c;
 };
 
 void leaf_bms_vars_init(struct leaf_bms_vars *self)
@@ -164,6 +168,10 @@ void leaf_bms_vars_init(struct leaf_bms_vars *self)
 	self->remain_cap_bars = 0u;
 
 	self->soh = 0u;
+
+	self->charge_power_limit_kwt = 0.0f;
+	self->max_power_for_charger_kwt = 0.0f;
+	self->temperature_c = 0.0f;
 }
 
 /******************************************************************************
@@ -281,6 +289,9 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 	 * 	13|10@0+ (80,20000) [20000|24000] "wh" Vector__XXX */
 	full_capacity = ((uint16_t)(frame->data[1] & 0x3Fu) << 4u) |
 			((uint16_t) frame->data[2]          >> 4u);
+
+	/* Battery temp */
+	self->_bms_vars.temperature_c = (int16_t)frame->data[3] - 40;
 
 	/* SG_ LB_Capacity_Deterioration_Rate :
 	 * 	33|7@1+ (1,0) [0|100] "%" Vector__XXX */
@@ -413,6 +424,9 @@ void _leaf_can_filter_ze0_x5BC(struct leaf_can_filter *self,
 void _leaf_can_filter_aze0_x5BC(struct leaf_can_filter *self,
 				struct leaf_can_filter_frame *frame)
 {
+	const uint8_t temp_lut[13] = {25, 28, 31, 34, 37, 50, 63,
+				      76, 80, 82, 85, 87, 90};
+
 	/* capacity_gids will show either full or remaining capacity
 	 * based on this mux */
 	bool full_capacity_mux = ((frame->data[5U] & 0x10U) > 0U);
@@ -428,6 +442,11 @@ void _leaf_can_filter_aze0_x5BC(struct leaf_can_filter *self,
 	 * 	7|10@0+ (1,0) [0|500] "gids" Vector__XXX */
 	capacity_gids = ((uint16_t)frame->data[0] << 2u) |
 			((uint16_t)frame->data[1] >> 6u);
+
+	/* Battery temp */
+	/*self->_bms_vars.temperature_c = (float)frame->data[3] * 0.416667f; */
+	self->_bms_vars.temperature_c =
+		(int16_t)temp_lut[(frame->data[3] / 20u)] - 40;
 
 	/* SG_ LB_Capacity_Deterioration_Rate :
 	 * 	33|7@1+ (1,0) [0|100] "%" Vector__XXX */
@@ -590,6 +609,29 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		/* Save remaining capacity into settings */
 		self->settings.capacity_remaining_kwh =
 			chgc_get_remain_cap_kwh(&self->_chgc);
+
+		break;
+	}
+
+	case 0x1DCu: {
+		uint16_t charge_power_limit_250w   = 0U;
+		uint16_t max_power_for_charger_kwt = 0U;
+
+		/* LB_Charge_Power_Limit */
+		charge_power_limit_250w =
+			((uint16_t)(frame->data[1] & 0x3Fu) << 4u) |
+			((uint16_t) frame->data[2]          >> 4u);
+
+		self->_bms_vars.charge_power_limit_kwt =
+			(float)charge_power_limit_250w * 0.25f;
+
+		/* LB_MAX_POWER_FOR_CHARGER */
+		max_power_for_charger_kwt =
+			((uint16_t)(frame->data[2] & 0x0Fu) << 6u) |
+			((uint16_t) frame->data[3]          >> 2u);
+
+		self->_bms_vars.max_power_for_charger_kwt =
+			(float)max_power_for_charger_kwt * 0.1 - 10.0;
 
 		break;
 	}

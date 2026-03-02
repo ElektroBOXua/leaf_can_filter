@@ -33,5 +33,11 @@
   "LC_FIRMWARE_UPDATE_TITLE": "Firmware Update",
   "LC_FIRMWARE_CONFIRM_BTN": "Confirm",
   "LC_RESET_SOC_TITLE": "Reset SOC to 100%",
-  "LC_RESET_SOC_CONFIRM": "This option will reset SOC(manually set) to 100%"
+  "LC_RESET_SOC_CONFIRM": "This option will reset SOC(manually set) to 100%",
+
+  "LC_STATUS_BMS_TEMP": "BMS Temp.: ",
+  "LC_STATUS_MAX_IN": "Max. input: ",
+  "LC_STATUS_MAX_CHG_IN": "Max. charge: ",
+  "LC_STATUS_MIN_CELL": "Min. cell: ",
+  "LC_STATUS_MAX_CELL": "Max. cell: "
 }

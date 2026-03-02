@@ -33,5 +33,11 @@
   "LC_FIRMWARE_UPDATE_TITLE": "Оновлення прошивки",
   "LC_FIRMWARE_CONFIRM_BTN": "Підтвердити",
   "LC_RESET_SOC_TITLE": "Скинути SOC до 100%",
-  "LC_RESET_SOC_CONFIRM": "Дане налаштування скине SOC(встановлений вручну) до 100%"
+  "LC_RESET_SOC_CONFIRM": "Дане налаштування скине SOC(встановлений вручну) до 100%",
+
+  "LC_STATUS_BMS_TEMP": "Темп BMS.: ",
+  "LC_STATUS_MAX_IN": "Макс. вхід: ",
+  "LC_STATUS_MAX_CHG_IN": "Макс. заряд: ",
+  "LC_STATUS_MIN_CELL": "Мін. комірка: ",
+  "LC_STATUS_MAX_CELL": "Макс. комірка: "
 }

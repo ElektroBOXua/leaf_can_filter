@@ -119,6 +119,12 @@ void leaf_can_filter_print_variables(struct leaf_can_filter_frame *df,
 
 	sprintf(buf + strlen(buf), "soh:             %u%%                  \n",
 		fi._bms_vars.soh);
+	sprintf(buf + strlen(buf), "chg_pow_lim_kwt: %f                    \n",
+		fi._bms_vars.charge_power_limit_kwt);
+	sprintf(buf + strlen(buf), "max_pow_for_chgr_kwt: %f               \n",
+		fi._bms_vars.max_power_for_charger_kwt);
+	sprintf(buf + strlen(buf), "temperature C:   %f                    \n",
+		fi._bms_vars.temperature_c);
 
 	sprintf(buf + strlen(buf), "\033[K\n");
 
@@ -200,7 +206,7 @@ int main()
 	fi.settings.capacity_override_enabled = true;
 	fi.settings.bms_version_override = 0u;
 	fi.settings.soh_mul = 1.0f;
-	file = fopen(files[11], "r");
+	file = fopen(files[0], "r");
 	assert(file);
 	
 	c = getc(file);

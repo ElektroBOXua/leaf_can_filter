@@ -809,13 +809,13 @@ function status_widget_create(id, parent)
 	l.set_direction('v');
 	l.style.alignItems = 'end';
 
-	//const r = container_create(s);
+	const r = container_create(s);
 	//r.style.alignItems = 'end';
-	//r.set_direction('v');
+	r.set_direction('v');
 
-	pane.sta_title = text_create(l);
-	pane.sta_title.set_text(tr("LC_STATUS_BMS"));
-	pane.sta_title.style.alignSelf = 'center';
+	//pane.sta_title = text_create(l);
+	//pane.sta_title.set_text(tr("LC_STATUS_BMS"));
+	//pane.sta_title.style.alignSelf = 'center';
 	pane.voltage	     = text_create(l);
 	pane.current	     = text_create(l);
 	pane.full_cap	     = text_create(l);
@@ -824,13 +824,19 @@ function status_widget_create(id, parent)
 	//pane.temp	     = text_create(l);
 	//pane.max_input_power = text_create(l);
 
-	/*pane.veh_title = text_create(r);
-	pane.veh_title.set_text("Авто");
-	pane.veh_title.style.alignSelf = 'center';
-	pane.session_kwt   = text_create(r);
-	pane.total_kwt	   = text_create(r);
-	pane.charhing_time = text_create(r);
-	pane.time_left	   = text_create(r);*/
+	//pane.veh_title = text_create(r);
+	//pane.veh_title.set_text("Авто");
+	//pane.veh_title.style.alignSelf = 'center';
+	pane.temp            = text_create(r);
+	pane.max_in_kwt      = text_create(r);
+	pane.max_chg_in_kwt  = text_create(r);
+	pane.min_cell        = text_create(r);
+	pane.max_cell        = text_create(r);
+
+	//pane.session_kwt   = text_create(r);
+	//pane.total_kwt	   = text_create(r);
+	//pane.charhing_time = text_create(r);
+	//pane.time_left	   = text_create(r);
 
 	pane.soc = text_create(pane);
 	pane.soc.set_size(1.5);
@@ -838,7 +844,8 @@ function status_widget_create(id, parent)
 	net.add_listener(pane, id);
 
 	pane.net.recv = function(data) {
-		const [voltage, current, full_cap, cap, version, soh] = data;
+		const [voltage, current, full_cap, cap, version, soh,
+		       temp, max_in, chg_max_in, min_cell, max_cell] = data;
 
 		let ver_str = "invalid";
 
@@ -846,6 +853,7 @@ function status_widget_create(id, parent)
 			ver_str = ["unknown", "ze0", "aze0", "nv200"][version];
 		}
 
+		/* Left panel */
 		pane.voltage.set_text(tr("LC_STATUS_VOLTAGE") + voltage + "V");
 		pane.current.set_text(tr("LC_STATUS_CURRENT") + current + "A");
 		pane.full_cap.set_text(tr("LC_STATUS_FULL_CAP") + full_cap + "kWh");
@@ -854,6 +862,13 @@ function status_widget_create(id, parent)
 
 		pane.soc.set_text(tr("LC_STATUS_SOC") + parseInt((cap / full_cap) * 100) + "% | " +
 				  tr("LC_STATUS_SOH") + parseInt(soh));
+
+		/* Right panel */
+		pane.temp.set_text(tr("LC_STATUS_BMS_TEMP")     + temp  + "C");
+		pane.max_in_kwt.set_text(tr("LC_STATUS_MAX_IN") + max_in + "kWt");
+		pane.max_chg_in_kwt.set_text(tr("LC_STATUS_MAX_CHG_IN") + chg_max_in + "kWt");
+		//pane.min_cell.set_text(tr("LC_STATUS_MIN_CELL") + min_cell + "V");
+		//pane.max_cell.set_text(tr("LC_STATUS_MAX_CELL") + max_cell + "V (d=" + parseFloat(max_cell - min_cell).toFixed(3) + ")");
 	};
 
 	return pane;
