@@ -264,6 +264,10 @@ struct leaf_can_filter {
 
 	/* Soh reset FSM */
 	struct lcf_sr soh_rst_fsm;
+
+	/* Counts how much time we spent being undercharged,
+	 * Will reset after 2min (hardcoded) */
+	uint32_t undercharge_counter_ms;
 };
 
 /******************************************************************************
@@ -653,6 +657,45 @@ void _leaf_can_filter_aze0_x5BC(struct leaf_can_filter *self,
 	self->_bms_vars.soh_pct = soh_pct;
 }
 
+/** Controls discharge, when battery voltage drops below certain
+ * threshold. Currently it only drops capacity counter to 1%, so it tells
+ * the vehicle that it has to limit its power */
+void _leaf_can_filter_control_discharge(struct leaf_can_filter *self,
+					uint32_t delta_time_ms)
+{
+	/* Flag that tells if discharge threshold was reached */
+	bool discharge_threshold_reached = false;
+
+	/* If capacity override_enabled and
+	   discharge threshold enabled and
+	   voltage is less than discharge threshold voltage */
+	if (self->settings.capacity_override_enabled &&
+	    self->settings.discharge_threshold_enabled &&
+	    (self->_bms_vars.voltage_V <=
+	     self->settings.discharge_threshold_voltage_V)) {
+		     discharge_threshold_reached = true;
+	}
+
+	if (discharge_threshold_reached) {
+		/* Delay triggering due to instant voltage fluctuations
+		 * (up to 2min) */
+		if (self->undercharge_counter_ms > (120u * 1000u)) {
+			/* Just reset (Still may trigger lately,
+			 * 	       but whatever) */
+			self->undercharge_counter_ms = 0u;
+
+			/* Set manual capacity to 1% */
+			chgc_set_initial_cap_kwh(&self->_chgc,
+				chgc_get_full_cap_kwh(&self->_chgc) * 0.01);
+		}
+
+		self->undercharge_counter_ms += delta_time_ms;
+	} else {
+		/* Reset counter if above threshold */
+		self->undercharge_counter_ms = 0u;
+	}
+}
+
 /* Filter HVBAT frames */
 void _leaf_can_filter(struct leaf_can_filter *self,
 		      struct leaf_can_filter_frame *frame)
@@ -694,7 +737,8 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		break;
 	}
 
-	/* BO_ 475 x1DB: 8 HVBAT */
+	/* BO_ 475 x1DB: 8 HVBAT
+	 * 10ms */
 	case 475U: {
 		/* Important WARNING:
 		 * Logs from nv200 (2019 year) does not have this message.
@@ -743,22 +787,9 @@ void _leaf_can_filter(struct leaf_can_filter *self,
 		self->_bms_vars.voltage_V = voltage_500mV / 2.0f;
 		self->_bms_vars.current_A = current_500mA / 2.0f;
 
-		/* If capacity override_enabled and
-		   discharge threshold enabled and
-		   voltage is less than discharge threshold voltage
-		   and remaining capacity is bigger that 2% */
-		/* TODO this condition is little too inefficient and requires
-		   refactor... */
-		if (self->settings.capacity_override_enabled &&
-		    self->settings.discharge_threshold_enabled &&
-		    (self->_bms_vars.voltage_V <=
-		     self->settings.discharge_threshold_voltage_V) &&
-		    (chgc_get_remain_cap_kwh(&self->_chgc) >
-		     (chgc_get_full_cap_kwh(&self->_chgc) * 0.02))) {
-			/* Set manual capacity to 1% */
-			chgc_set_initial_cap_kwh(&self->_chgc,
-				chgc_get_full_cap_kwh(&self->_chgc) * 0.01);
-		}
+		/* We pass 10ms delta time
+		 * (as we know that this message has 10ms period anyways) */
+		_leaf_can_filter_control_discharge(self, 10u);
 
 		/* Report voltage and current to our energy counter 
 		 * (Raw values scaled by 2x) */
@@ -949,6 +980,8 @@ void leaf_can_filter_init(struct leaf_can_filter *self)
 	self->clim_ctl_btn_alert = false;
 
 	lcf_sr_init(&self->soh_rst_fsm);
+
+	self->undercharge_counter_ms = 0u;
 }
 
 void leaf_can_filter_process_frame(struct leaf_can_filter *self,
